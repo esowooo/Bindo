@@ -219,7 +219,7 @@ final class DateView: UIView {
 
     
     // 체크박스(버튼 스타일) + 라벨
-    private let copyAmountCheck: UIButton = {
+    private let useBaseAmountCheck: UIButton = {
         var cfg = UIButton.Configuration.plain()
         cfg.image = UIImage(systemName: "square") // 기본: 체크 해제
         cfg.imagePadding = 8
@@ -429,7 +429,7 @@ final class DateView: UIView {
         copyAmountRow.alignment = .center
         copyAmountRow.spacing = 8
         copyAmountRow.translatesAutoresizingMaskIntoConstraints = false
-        copyAmountRow.addArrangedSubview(copyAmountCheck)
+        copyAmountRow.addArrangedSubview(useBaseAmountCheck)
         copyAmountRow.addArrangedSubview(copyAmountLabel)
         root.addArrangedSubview(copyAmountRow)
 
@@ -460,7 +460,7 @@ final class DateView: UIView {
         }
 
         // 체크박스 토글
-        copyAmountCheck.addAction(UIAction { [weak self] _ in
+        useBaseAmountCheck.addAction(UIAction { [weak self] _ in
             self?.toggleCopyAmount()
         }, for: .touchUpInside)
 
@@ -532,9 +532,9 @@ final class DateView: UIView {
     }
     
     private func updateCopyAmountCheckboxIcon() {
-        var cfg = copyAmountCheck.configuration ?? .plain()
+        var cfg = useBaseAmountCheck.configuration ?? .plain()
         cfg.image = UIImage(systemName: copyAmountEnabled ? "checkmark.square.fill" : "square")
-        copyAmountCheck.configuration = cfg
+        useBaseAmountCheck.configuration = cfg
         copyAmountLabel.alpha = copyAmountEnabled ? 1.0 : 0.7
     }
     
@@ -665,74 +665,110 @@ extension DateView: BindoForm {
     var optionName: String { "date" }
 
     func buildModel() throws -> BindoList {
+        // 1) 공통 입력
         let name = nameField.text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         guard !name.isEmpty else { throw BindoFormError.missingField("Name") }
 
         let start = startPicker.date
+
+        // 2) 기본 행(삭제 불가) 수집 + 검증
         let baseNext = baseRow.nextDate
-        let baseAmount = try requireAmount(baseRow.amount, fieldName: "Amount")
         try validateStart(start, before: baseNext)
 
-        // 추가 next/amount 수집
-        var occurs: [OccurrenceList] = [OccurrenceList(date: baseNext, amount: baseAmount)]
+        // 3) 추가 행 수집 (원본 순서로: 날짜/금액 쌍)
+        var pairs: [(date: Date, amount: Decimal?)] = []
+        // baseRow 먼저
+        pairs.append((date: baseNext, amount: baseRow.amount))
+        // 추가 rows
         for row in rows {
             let next = row.nextDate
             try validateStart(start, before: next)
-            let amount = try requireAmount(row.amount, fieldName: "Amount in rows")
-            occurs.append(OccurrenceList(date: next, amount: amount))
+            pairs.append((date: next, amount: row.amount))
         }
-        occurs.sort { $0.date < $1.date }
 
-        // interval = start → 첫 next 차이
-        let interval = Self.deriveInterval(start: start, next: baseNext)
-
-        // end = 마지막 next (있는 경우만 검증)
-        let end = occurs.last?.date
-        if let e = end { try validateStart(start, before: e) }
-
-        // 중복 날짜 제거
-        var deduped: [OccurrenceList] = []
+        // 4) 정렬 + 중복 제거(가장 이른 날짜부터)
+        pairs.sort { $0.date < $1.date }
+        var dedup: [(date: Date, amount: Decimal?)] = []
         var seen = Set<Date>()
-        for occur in occurs where seen.insert(occur.date).inserted {
-            deduped.append(occur)
+        for p in pairs {
+            let day = Calendar.current.startOfDay(for: p.date)
+            // 같은 날 중복이 있으면 '가장 먼저 등장한 것'만 사용
+            if seen.insert(day).inserted {
+                dedup.append((date: day, amount: p.amount))
+            }
         }
 
+        // 5) useBase 스위치 처리
+        let useBase = copyAmountEnabled
+        var baseAmount: Decimal? = nil
+        if useBase {
+            // 켜려면 baseRow.amount가 필수
+            baseAmount = try requireAmount(baseRow.amount, fieldName: "Amount")
+        }
+
+        // 6) Occurrence 체인 생성
+        var occurrences: [OccurrenceList] = []
+        var curStart = Calendar.current.startOfDay(for: start)
+
+        for (date, amtOpt) in dedup {
+            // payAmount 결정
+            let pay: Decimal
+            if useBase {
+                pay = baseAmount! // 위에서 검증 완료
+            } else {
+                pay = try requireAmount(amtOpt, fieldName: "Amount in rows")
+            }
+            // start < end 재검증(보수)
+            try validateStart(curStart, before: date)
+
+            let occ = OccurrenceList(
+                id: UUID(),
+                startDate: curStart,
+                endDate: date,
+                payAmount: pay
+            )
+            occurrences.append(occ)
+            curStart = date // 다음 구간의 시작 = 이번 end
+        }
+
+        // 7) endAt = 마지막 endDate (없을 수도)
+        let endAt = occurrences.last?.endDate
+
+        // 8) 모델 구성 (DateView는 interval을 쓰지 않으므로 nil)
         return BindoList(
             id: UUID(),
             name: name,
-            amount: baseAmount,
-            startDate: start,
-            endDate: end,
-            interval: interval,
-            option: optionName,
+            useBase: useBase,
+            baseAmount: useBase ? baseAmount : nil,
             createdAt: Date(),
             updatedAt: Date(),
-            occurrences: deduped
+            endAt: endAt,
+            option: optionName,        // "date"
+            interval: nil,             // ← DateView는 규칙 없이 개별 발생
+            occurrences: occurrences   // ← 반드시 채워짐(최소 1개)
         )
     }
-    
-    struct RowSig: Hashable {
-            let ymd: Int
-            let amount: String
-            let editable: Bool
-        }
-    
-    struct DateDirtySnapshopt: Hashable {
-            let name: String
-            let startYMD: Int
-            let baseNextYMD: Int
-            let baseAmount: String
-            let rows: [RowSig]
-        }
-    
 
-    // VC가 비교할 더티 스냅샷 (AnyHashable)
+    struct RowSig: Hashable {
+        let ymd: Int
+        let amount: String
+        let editable: Bool
+    }
+
+    struct DateDirtySnapshopt: Hashable {
+        let name: String
+        let startYMD: Int
+        let baseNextYMD: Int
+        let baseAmount: String
+        let rows: [RowSig]
+    }
+
     func dirtySignature() -> AnyHashable {
         let cal = Calendar.current
         let ymd: (Date) -> Int = { Int(cal.startOfDay(for: $0).timeIntervalSince1970 / 86_400) }
-        
+
         let baseAmtSig = baseRow.amount.map { "\($0)" } ?? ""
-        
+
         let rowSigs: [RowSig] = rows.map {
             RowSig(
                 ymd: ymd($0.nextDate),
@@ -740,7 +776,7 @@ extension DateView: BindoForm {
                 editable: $0.isAmountEditable
             )
         }
-        
+
         return AnyHashable(DateDirtySnapshopt(
             name: (nameField.text ?? "").trimmingCharacters(in: .whitespacesAndNewlines),
             startYMD: ymd(startPicker.date),
@@ -750,13 +786,11 @@ extension DateView: BindoForm {
         ))
     }
 
-    // Discard 시 초기화(간단·명확)
     func reset() {
-        // 이름/시작일 초기화
+        // (기존 그대로)
         nameField.text = ""
         startPicker.setDate(Date(), animated: false)
 
-        // 기본 next(삭제 불가 행) 초기화: 현재 start로부터 +1개월
         if let next = Calendar.current.date(byAdding: .month, value: 1, to: startPicker.date) {
             baseRow.nextDate = next
         } else {
@@ -764,17 +798,13 @@ extension DateView: BindoForm {
         }
         baseRow.amount = nil
 
-        // 추가 행 제거
         rows.forEach { $0.removeFromSuperview() }
         rows.removeAll()
 
-        // 금액 복사 옵션 OFF + 아이콘 반영
         copyAmountEnabled = false
         updateCopyAmountCheckboxIcon()
 
-        // 요약 갱신
         updateSummary()
-
         setNeedsLayout()
         layoutIfNeeded()
     }

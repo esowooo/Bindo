@@ -227,7 +227,34 @@ final class UpdateBindoVC: UIViewController {
             return
         }
         do {
-            let model = try form.buildModel()
+            var model = try form.buildModel() // IntervalView가 첫 Occ 포함해서 반환
+
+            if let id = editingID, let existing = try? repo.fetch(id: id) {
+                // 🔒 option 변경 금지
+                let oldOpt = existing.option.lowercased()
+                let newOpt = model.option.lowercased()
+                if oldOpt != newOpt {
+                    AppAlert.info(on: self,
+                                  title: "Not allowed",
+                                  message: "This item was created in \(oldOpt.capitalized) view. Changing to \(newOpt.capitalized) is restricted.")
+                    return
+                }
+
+                // 편집: id/createdAt 유지, updatedAt만 today로 갱신
+                model = BindoList(
+                    id: existing.id,
+                    name: model.name,
+                    useBase: model.useBase,
+                    baseAmount: model.baseAmount,
+                    createdAt: existing.createdAt,  // 보존
+                    updatedAt: Date(),              // 갱신
+                    endAt: model.endAt,
+                    option: existing.option,        // 보존
+                    interval: model.interval,
+                    occurrences: model.occurrences  // 폼에서 온 첫 Occ(필요 시 교체)
+                )
+            }
+
             try repo.upsert(model)
             cancelTapped()
         } catch {

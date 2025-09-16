@@ -17,12 +17,12 @@ final class MainVC: UIViewController {
 
     // MARK: - Properties
     private let menu = FloatingActionMenu()
-    private let repo: BindoRepository = CoreDataBindoRepository()
+    private let repo: (BindoRepository & RefreshRepository) = CoreDataBindoRepository()
     private lazy var ctx = Persistence.shared.viewContext
 
     // FRC: Bindo 최신 생성순
     private lazy var frc: NSFetchedResultsController<Bindo> = {
-        let req: NSFetchRequest<Bindo> = Bindo.fetchRequest()   // 제네릭 명시
+        let req: NSFetchRequest<Bindo> = Bindo.fetchRequest()
         req.sortDescriptors = [NSSortDescriptor(key: "createdAt", ascending: false)]
         let frc = NSFetchedResultsController(
             fetchRequest: req,
@@ -35,8 +35,7 @@ final class MainVC: UIViewController {
     }()
     
     private var isOnWindow: Bool { isViewLoaded && view.window != nil }
-
-
+    private var needsReloadOnAppear = false
 
     // MARK: - Lifecycle
     override func viewDidLoad() {
@@ -46,12 +45,26 @@ final class MainVC: UIViewController {
         applyAppearance()
         wireLongPressDeletion()
     }
+
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
-        performFetch()
+        do {
+            try repo.ensureAllCurrentCycles()  // 저장/변경 가능
+            try frc.performFetch()             // 최신 스냅샷 반영
+            tableView.reloadData()             // 데이터소스와 UI 일치
+            needsReloadOnAppear = false
+        } catch {
+            print("refresh/fetch error:", error)
+        }
     }
+
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
+        if needsReloadOnAppear {
+            try? frc.performFetch()
+            tableView.reloadData()
+            needsReloadOnAppear = false
+        }
         showMenu()
     }
 
@@ -136,10 +149,9 @@ final class MainVC: UIViewController {
         tableView.dataSource = self
         tableView.delegate   = self
         tableView.backgroundColor = .clear
-        tableView.separatorStyle = .singleLine
-        tableView.separatorColor = AppTheme.Color.main3.withAlphaComponent(0.2)
+        tableView.separatorStyle = .none
         tableView.rowHeight = 80
-        tableView.estimatedRowHeight = 80   // 성능 최적화용
+        tableView.estimatedRowHeight = 80
 
         tableView.register(BindoListCell.self, forCellReuseIdentifier: "BindoListCell")
 
@@ -154,12 +166,11 @@ final class MainVC: UIViewController {
         tableView.refreshControl = refresh
     }
     
-    // MARK: - Table Cell Tools
+    // MARK: - Formatters
     private lazy var currencyFormatter: NumberFormatter = {
         let f = NumberFormatter()
+        // 설정에서 현지 통화 지원 전까지는 숫자만
         f.numberStyle = .none
-        //TODO: - local currency depending on setting?
-//        f.numberStyle = .currency
         f.locale = .current
         return f
     }()
@@ -274,11 +285,11 @@ final class MainVC: UIViewController {
 // MARK: - TableView DataSource
 extension MainVC: UITableViewDataSource {
     func numberOfSections(in tableView: UITableView) -> Int {
-        frc.sections?.count ?? 1
+        return frc.sections?.count ?? 0
     }
 
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        frc.sections?[section].numberOfObjects ?? 0
+        return frc.sections?[section].numberOfObjects ?? 0
     }
 
     func tableView(_ tableView: UITableView,
@@ -288,11 +299,14 @@ extension MainVC: UITableViewDataSource {
                                                  for: indexPath) as! BindoListCell
         cell.contentView.alpha = 1.0
         let entity = frc.object(at: indexPath)
-        let vm = makeRowDisplay(for: entity)
 
+        let vm = makeRowDisplay(for: entity)
         cell.configure(name: vm.name, amount: vm.amountText, next: vm.leftText, interval: vm.rightText)
-        let pay = (try? (repo as? CoreDataBindoRepository)?.effectivePay(for: entity)) ?? (next: nil, last: nil, end: nil)
-        cell.setProgress(start: entity.startDate, next: pay.next)
+
+        // 진행도: 현재 구간(start~next)로 표시
+        let period = currentPeriod(for: entity)
+        cell.setProgress(start: period.start, next: period.end, endAt: entity.endAt)
+        
         cell.backgroundColor = .clear
         cell.selectionStyle = .default
         return cell
@@ -302,18 +316,29 @@ extension MainVC: UITableViewDataSource {
     private struct RowDisplay {
         let name: String
         let amountText: String
-        let leftText: String
-        let rightText: String
+        let leftText: String   // Pay Day 라벨
+        let rightText: String  // Days/Expires 라벨
     }
 
     private func makeRowDisplay(for e: Bindo) -> RowDisplay {
         let name = e.name ?? "-"
-        let amount = (e.amount as Decimal?) ?? 0
-        let amountText = currencyFormatter.string(from: amount as NSDecimalNumber) ?? "\(amount)"
 
-        let pay = (try? (repo as? CoreDataBindoRepository)?.effectivePay(for: e)) ?? (next: nil, last: nil, end: nil)
-        let left = makePayDayLeftText(next: pay.next, last: pay.last)
-        let right = makeRightDaysText(for: e, next: pay.next, last: pay.last, end: pay.end)
+        // 금액: useBase면 baseAmount, 아니면 '다음 Occurence의 payAmount' 우선 사용
+        let nextOcc = nextOccurrence(for: e)
+        let amountDecimal: Decimal = {
+            if e.useBase, let base = e.baseAmount { return base.decimalValue }
+            if let pay = nextOcc?.payAmount { return pay.decimalValue }
+            return e.baseAmount?.decimalValue ?? 0
+        }()
+        let amountText = currencyFormatter.string(from: amountDecimal as NSDecimalNumber) ?? "\(amountDecimal)"
+
+        // 날짜 표시
+        _ = Calendar.current
+        let next = nextOcc?.endDate
+        let last = lastOccurrence(for: e)?.endDate
+
+        let left = makePayDayLeftText(next: next, last: last)
+        let right = makeRightDaysText(for: e, next: next, last: last, end: e.endAt)
 
         return .init(name: name, amountText: amountText, leftText: left, rightText: right)
     }
@@ -348,10 +373,7 @@ extension MainVC: UITableViewDataSource {
 
         // 2) Date View: next가 '마지막'이면 Expires
         if (e.option ?? "interval").lowercased() == "date" {
-            if let pair = try? (repo as? CoreDataBindoRepository)?.nextTwoOccurrences(for: e),
-               let first = pair.first,
-               cal.isDate(first, inSameDayAs: nextDay),
-               pair.second == nil {
+            if let end = end, cal.isDate(end, inSameDayAs: nextDay) {
                 return cal.isDateInToday(nextDay)
                 ? "Expires today"
                 : "Expires in \(max(0, dayDiff(today, nextDay))) day(s)"
@@ -370,9 +392,71 @@ extension MainVC: UITableViewDataSource {
         let d = dayDiff(today, nextDay)
         return d <= 0 ? "0 day(s) left" : "\(d) day(s) left"
     }
-    
-    
-    
+
+    // 현재 진행중인 구간 (진행도 표시용)
+    private func currentPeriod(for e: Bindo) -> (start: Date?, end: Date?) {
+        let cal = Calendar.current
+        let today = cal.startOfDay(for: Date())
+
+        guard let occs = (e.occurrences as? Set<Occurence>), !occs.isEmpty else {
+            return (nil, nil)
+        }
+
+        // 다음 결제 주기
+        let next = occs
+            .compactMap { $0.endDate }
+            .filter { cal.startOfDay(for: $0) >= today }
+            .min()
+
+        // 해당 next에 매칭되는 startDate
+        if let next {
+            let start = occs.first(where: { $0.endDate != nil && cal.isDate($0.endDate!, inSameDayAs: next) })?.startDate
+            return (start, next)
+        }
+
+        // 미래가 없으면 가장 최근 과거 구간
+        if let last = occs
+            .compactMap({ $0.endDate })
+            .filter({ cal.startOfDay(for: $0) <= today })
+            .max() {
+
+            let start = occs.first(where: { $0.endDate != nil && cal.isDate($0.endDate!, inSameDayAs: last) })?.startDate
+            return (start, last)
+        }
+
+        return (nil, nil)
+    }
+
+    // 다음/마지막 Occurence 계산
+    private func nextOccurrence(for e: Bindo) -> Occurence? {
+        let cal = Calendar.current
+        let today = cal.startOfDay(for: Date())
+        guard let occs = (e.occurrences as? Set<Occurence>), !occs.isEmpty else { return nil }
+
+        // endAt이 있으면 그 이후는 제외
+        let endAt = e.endAt.map { cal.startOfDay(for: $0) }
+
+        return occs
+            .filter { $0.endDate != nil }
+            .filter { occ in
+                let day = cal.startOfDay(for: occ.endDate!)
+                if let endAt { guard day <= endAt else { return false } }
+                return day >= today
+            }
+            .sorted { $0.endDate! < $1.endDate! }
+            .first
+    }
+
+    private func lastOccurrence(for e: Bindo) -> Occurence? {
+        let cal = Calendar.current
+        let today = cal.startOfDay(for: Date())
+        guard let occs = (e.occurrences as? Set<Occurence>), !occs.isEmpty else { return nil }
+
+        return occs
+            .filter { $0.endDate != nil && cal.startOfDay(for: $0.endDate!) <= today }
+            .sorted { $0.endDate! < $1.endDate! }
+            .last
+    }
 }
 
 // MARK: - TableView Delegate
@@ -385,7 +469,6 @@ extension MainVC: UITableViewDelegate {
         hideMenu(animated: true)
         navigationController?.pushViewController(vc, animated: true)
     }
-    
     
     func tableView(_ tv: UITableView,
                    trailingSwipeActionsConfigurationForRowAt indexPath: IndexPath) -> UISwipeActionsConfiguration? {
@@ -404,24 +487,20 @@ extension MainVC: UITableViewDelegate {
                              message: "Remove \"\(entity.name ?? "Item")\"",
                              actions: [
                                 .init(title: "Cancel", style: .cancel) { [weak self] in
-                                    // 사용자가 취소하면 알파 복구
                                     self?.restoreCellAlphaIfVisible(at: indexPath)
                                     done(false)
                                 },
                                 .init(title: "Delete", style: .destructive) { [weak self] in
                                     guard let self else { done(false); return }
-                                    // 페이드아웃 스냅샷
                                     self.fadeOutCellSnapshot(at: indexPath)
 
                                     guard let id = entity.id else { done(false); return }
                                     do {
                                         try self.repo.delete(id: id)
-                                        // FRC가 실제 row 삭제 애니메이션 처리
                                         let h = UIImpactFeedbackGenerator(style: .light)
                                         h.impactOccurred()
                                         done(true)
                                     } catch {
-                                        // 실패 시 알파 복구 + 에러 표시
                                         self.restoreCellAlphaIfVisible(at: indexPath)
                                         AppAlert.present(on: self,
                                                          title: "Error",
@@ -436,16 +515,13 @@ extension MainVC: UITableViewDelegate {
         return AppSwipe.trailing([delete], fullSwipe: true)
     }
     
-    
     // Delete Animation Helpers
     private func fadeOutCellSnapshot(at indexPath: IndexPath) {
         guard let cell = tableView.cellForRow(at: indexPath) else { return }
 
-        // 셀 내용은 잠깐 숨기고(겹침 방지), 스냅샷으로 페이드
         cell.contentView.alpha = 0
 
         guard let snap = cell.contentView.snapshotView(afterScreenUpdates: false) else { return }
-        // 스냅샷을 테이블 좌표계로 맞춰서 덮어씌움
         let frameInTable = tableView.convert(cell.contentView.bounds, from: cell.contentView)
         snap.frame = frameInTable
         tableView.addSubview(snap)
@@ -469,38 +545,51 @@ extension MainVC: UITableViewDelegate {
             }
         }
     }
-    
 }
 
-// MARK: - FRC Delegate (테이블 자동 갱신)
+// MARK: - FRC Delegate (정석 버전)
 extension MainVC: NSFetchedResultsControllerDelegate {
     func controllerWillChangeContent(_ controller: NSFetchedResultsController<NSFetchRequestResult>) {
-        guard tableView.window != nil else { return }
+        guard isOnWindow else { needsReloadOnAppear = true; return }
         tableView.beginUpdates()
     }
-    
-    func controllerDidChangeContent(_ controller: NSFetchedResultsController<NSFetchRequestResult>) {
-        guard tableView.window != nil else { return }
-        tableView.endUpdates()
-    }
-    
+
     func controller(_ controller: NSFetchedResultsController<NSFetchRequestResult>,
-                    didChange anObject: Any,
-                    at indexPath: IndexPath?, for type: NSFetchedResultsChangeType,
-                    newIndexPath: IndexPath?) {
-        guard tableView.window != nil else { return }
-        switch type {
-        case .insert:
-            if let new = newIndexPath { tableView.insertRows(at: [new], with: .automatic) }
-        case .delete:
-            if let idx = indexPath { tableView.deleteRows(at: [idx], with: .automatic) }
-        case .move:
-            if let idx = indexPath { tableView.deleteRows(at: [idx], with: .automatic) }
-            if let new = newIndexPath { tableView.insertRows(at: [new], with: .automatic) }
-        case .update:
-            if let idx = indexPath { tableView.reloadRows(at: [idx], with: .automatic) }
-        @unknown default:
-            tableView.reloadData()
+                        didChange anObject: Any,
+                        at indexPath: IndexPath?,
+                        for type: NSFetchedResultsChangeType,
+                        newIndexPath: IndexPath?) {
+            guard isOnWindow else { needsReloadOnAppear = true; return }
+            switch type {
+            case .insert:
+                if let new = newIndexPath { tableView.insertRows(at: [new], with: .automatic) }
+            case .delete:
+                if let idx = indexPath   { tableView.deleteRows(at: [idx], with: .automatic) }
+            case .update:
+                if let idx = indexPath   { tableView.reloadRows(at: [idx], with: .automatic) }
+            case .move:
+                if let from = indexPath, let to = newIndexPath {
+                    if from == to { tableView.reloadRows(at: [from], with: .automatic) }
+                    else          { tableView.moveRow(at: from, to: to) }
+                }
+            @unknown default: break
+            }
         }
-    }
+
+        func controller(_ controller: NSFetchedResultsController<NSFetchRequestResult>,
+                        didChange sectionInfo: NSFetchedResultsSectionInfo,
+                        atSectionIndex sectionIndex: Int,
+                        for type: NSFetchedResultsChangeType) {
+            guard isOnWindow else { needsReloadOnAppear = true; return }
+            switch type {
+            case .insert: tableView.insertSections(IndexSet(integer: sectionIndex), with: .automatic)
+            case .delete: tableView.deleteSections(IndexSet(integer: sectionIndex), with: .automatic)
+            default: break
+            }
+        }
+
+        func controllerDidChangeContent(_ controller: NSFetchedResultsController<NSFetchRequestResult>) {
+            guard isOnWindow else { return }
+            tableView.endUpdates()
+        }
 }

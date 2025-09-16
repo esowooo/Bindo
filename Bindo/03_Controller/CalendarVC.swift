@@ -26,6 +26,27 @@ class CalendarVC: UIViewController {
     
     @IBOutlet weak var nextButton: UIButton!
     @IBOutlet weak var prevButton: UIButton!
+    private lazy var titleTapButton: UIButton = {
+        var cfg = UIButton.Configuration.plain()
+        cfg.cornerStyle = .capsule
+        cfg.baseBackgroundColor = .clear
+        cfg.baseForegroundColor = AppTheme.Color.accent
+        cfg.contentInsets = .zero
+
+        let b = UIButton(configuration: cfg)
+        b.translatesAutoresizingMaskIntoConstraints = false
+        b.isHidden = true
+        b.alpha = 0
+
+        b.layer.borderWidth = 1
+        b.layer.cornerRadius = 12
+        b.layer.borderColor = AppTheme.Color.background.cgColor
+
+        b.addAction(UIAction { [weak self] _ in
+            self?.jumpToCurrentMonth()
+        }, for: .touchUpInside)
+        return b
+    }()
     
     // Dependencies
     var eventSource: CalendarEventSource?
@@ -75,6 +96,30 @@ class CalendarVC: UIViewController {
         topView.layer.cornerCurve = .continuous
         topView.clipsToBounds = true
         
+        if titleTapButton.superview == nil {
+            topView.addSubview(titleTapButton)
+            // 라벨 뒤로 넣어 배경만 보이게
+            if let label = monthLabel {
+                topView.insertSubview(titleTapButton, belowSubview: label)
+                NSLayoutConstraint.activate([
+                    titleTapButton.leadingAnchor.constraint(equalTo: label.leadingAnchor, constant: -2),
+                    titleTapButton.trailingAnchor.constraint(equalTo: label.trailingAnchor, constant: 2),
+                    titleTapButton.topAnchor.constraint(equalTo: label.topAnchor, constant: -4),
+                    titleTapButton.bottomAnchor.constraint(equalTo: label.bottomAnchor, constant: 4),
+                    titleTapButton.centerYAnchor.constraint(equalTo: label.centerYAnchor)
+                ])
+            } else {
+                // 라벨 연결이 없을 때 안전 대체(상단 오른쪽)
+                topView.addSubview(titleTapButton)
+                NSLayoutConstraint.activate([
+                    titleTapButton.topAnchor.constraint(equalTo: topView.topAnchor, constant: 8),
+                    titleTapButton.trailingAnchor.constraint(equalTo: topView.trailingAnchor, constant: -8),
+                    titleTapButton.heightAnchor.constraint(equalToConstant: 28),
+                    titleTapButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 80)
+                ])
+            }
+        }
+        
         // 월 라벨
         monthLabel.font = AppTheme.Font.secondaryTitle
         monthLabel.textColor = AppTheme.Color.main1
@@ -86,8 +131,6 @@ class CalendarVC: UIViewController {
             cfg.baseForegroundColor = AppTheme.Color.accent
             cfg.image = UIImage(systemName: name)
             btn.configuration = cfg
-//            btn.imageView?.contentMode = .scaleAspectFit
-//            btn.imageView?.transform = CGAffineTransform(scaleX: 1.0, y: 3.5)
         }
         configButton(prevButton, name: "chevron.left")
         configButton(nextButton, name: "chevron.right")
@@ -120,6 +163,14 @@ class CalendarVC: UIViewController {
         default: break
         }
     }
+    
+    @objc private func jumpToCurrentMonth() {
+        currentMonth = CalendarUtils.startOfMonth(Date())
+        reloadMonth(animated: true)
+    }
+
+    // (옵션) 타이틀 라벨 탭도 허용했을 때
+    @objc private func jumpToCurrentMonthViaTap() { jumpToCurrentMonth() }
     
     // MARK: - Data
     private func shiftMonth(by delta: Int) {
@@ -172,6 +223,7 @@ class CalendarVC: UIViewController {
         } else {
             calendarView.reloadData()
         }
+        updateCurrentBadge()
     }
     
     
@@ -192,6 +244,30 @@ class CalendarVC: UIViewController {
             flow.minimumInteritemSpacing = 0
             flow.minimumLineSpacing = 0
             flow.sectionInset = .zero
+        }
+    }
+    
+    
+    private func isCurrentDisplayedMonth() -> Bool {
+        CalendarUtils.cal.isDate(currentMonth, equalTo: Date(), toGranularity: .month)
+    }
+
+    private func updateCurrentBadge() {
+        let shouldShow = !isCurrentDisplayedMonth()
+        guard shouldShow != !titleTapButton.isHidden else { return }
+
+        if shouldShow {
+            monthLabel.textColor = AppTheme.Color.main1
+            titleTapButton.isHidden = false
+            UIView.animate(withDuration: 0.18) { self.titleTapButton.alpha = 1; self.monthLabel.textColor = AppTheme.Color.accent }
+        } else {
+            UIView.animate(withDuration: 0.18, animations: {
+                self.monthLabel.textColor = AppTheme.Color.main1
+                self.titleTapButton.alpha = 0
+            }, completion: { _ in
+                self.monthLabel.textColor = AppTheme.Color.main1
+                self.titleTapButton.isHidden = true
+            })
         }
     }
     

@@ -7,41 +7,21 @@
 
 import UIKit
 
-
-
-
 final class StatsVC: UIViewController {
     // MARK: - IBOutlets (스토리보드 연결)
-    @IBOutlet weak var containerView: UIView!
-    @IBOutlet weak var chartView: ContinuousChartView!
+    @IBOutlet weak var chartView: BarChartView!
     @IBOutlet weak var topView: UIView!
+    @IBOutlet weak var chartControlView: UIView!
     @IBOutlet weak var titleLabel: UILabel!
     @IBOutlet weak var dismissButton: UIButton!
     @IBOutlet weak var controlStack: UIStackView!
 
-    @IBAction func dismissButtonPressed(_ sender: UIButton) {
-        dismiss(animated: true)
-    }
-    private let noDataLabel: UILabel = {
-        let l = UILabel()
-        l.translatesAutoresizingMaskIntoConstraints = false
-        l.numberOfLines = 0
-        l.textAlignment = .center
-        l.text = "No data available"
-        l.textColor = AppTheme.Color.main2.withAlphaComponent(0.9)
-        l.font = AppTheme.Font.secondaryBody
-        l.isHidden = true
-        return l
-    }()
-    
-    //MARK: - 주입
+    // MARK: - 주입
     var provider: StatsProvider?
 
     // MARK: - 상태
     private let cal = Calendar.current
-    private var granularity: StatsGranularity = .month {
-        didSet { applyGranularityChange() }
-    }
+    private var granularity: StatsGranularity = .month { didSet { applyGranularityChange() } }
     private var anchorDate: Date = Date()
     private var modeButtons: [UIButton] = []
     private lazy var axisOverlay: AxisOverlayView = {
@@ -49,22 +29,41 @@ final class StatsVC: UIViewController {
         v.translatesAutoresizingMaskIntoConstraints = false
         return v
     }()
-    
+
+    // 범위 제어(좌/우 스팬)
+    private var leftSpan: Int  = 3
+    private var rightSpan: Int = 3
+    private let spanStep = 1
+    private let minSpan  = 0
+    private let maxSpan  = 24
+
+    private var rangeStack: UIStackView!
+    private var lastLayoutSize: CGSize = .zero
+
     // MARK: - Lifecycle
     override func viewDidLoad() {
         super.viewDidLoad()
-        
+
         if provider == nil {
             let repo = CoreDataBindoRepository(context: Persistence.shared.viewContext)
             provider = RepositoryStatsProvider(repo: repo) // StatsRepository만 의존
         }
-        
+
         buildUI()
         buildControls(["Month", "Year"])
         applyTheme()
         anchorDate = periodStart(for: Date(), granularity: granularity)
         updateTitle()
         renderChart()
+    }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        // 차트 뷰 크기가 바뀌면(회전/초기 레이아웃) 막대 폭/간격 재계산을 위해 재렌더
+        if chartView.bounds.size != lastLayoutSize {
+            lastLayoutSize = chartView.bounds.size
+            renderChart()
+        }
     }
 
     // MARK: - UI 구성
@@ -74,9 +73,7 @@ final class StatsVC: UIViewController {
         chartView.layer.cornerCurve  = .continuous
         chartView.clipsToBounds      = true
         chartView.backgroundColor    = .clear
-        chartView.lineColor          = AppTheme.Color.accent
-        chartView.fillTop            = AppTheme.Color.accent.withAlphaComponent(0.22)
-        chartView.fillBottom         = AppTheme.Color.accent.withAlphaComponent(0.06)
+        chartView.lineColor          = AppTheme.Color.main1
 
         // 축 오버레이를 chartView의 서브뷰로 넣음 (같은 좌표계)
         axisOverlay.translatesAutoresizingMaskIntoConstraints = false
@@ -105,6 +102,7 @@ final class StatsVC: UIViewController {
     }
 
     private func buildControls(_ items: [String]) {
+        // 1) 모드 버튼(월/연)
         controlStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
         modeButtons.removeAll()
 
@@ -127,41 +125,137 @@ final class StatsVC: UIViewController {
             modeButtons.append(btn)
         }
         updateModeButtons()
+
+        // 2) 범위 제어 스택(차트 컨트롤 영역 안으로 이동)
+        rangeStack?.removeFromSuperview()
+        let rs = UIStackView()
+        rs.axis = .horizontal
+        rs.spacing = 8
+        rs.alignment = .center
+        rs.distribution = .equalSpacing
+        rs.isLayoutMarginsRelativeArrangement = true
+        rs.directionalLayoutMargins = .init(top: 0, leading: 8, bottom: 0, trailing: 8)
+        rs.translatesAutoresizingMaskIntoConstraints = false
+
+        let items: [(symbol: String, selector: Selector, a11y: String)] = [
+            ("chevron.left", #selector(prevAnchorTapped),  "Previous period"),
+            ("minus",        #selector(zoomoutRangeTapped), "Narrow range"),
+            ("circle",  #selector(centerRangeTapped),  "Current Period"),
+            ("plus",         #selector(zoominRangeTapped),  "Widen range"),
+            ("chevron.right",#selector(nextAnchorTapped),   "Next period")
+        ]
+
+        for spec in items {
+            var cfg = UIButton.Configuration.filled()
+            cfg.cornerStyle = .capsule
+            cfg.baseBackgroundColor = .clear
+            cfg.baseForegroundColor = AppTheme.Color.accent
+            cfg.image = UIImage(systemName: spec.symbol)
+            cfg.preferredSymbolConfigurationForImage = UIImage.SymbolConfiguration(pointSize: 12, weight: .semibold)
+            cfg.contentInsets = .init(top: 8, leading: 10, bottom: 8, trailing: 10)
+            cfg.title = nil
+            cfg.attributedTitle = nil
+
+            let b = UIButton(configuration: cfg)
+            b.addTarget(self, action: spec.selector, for: .touchUpInside)
+            b.accessibilityLabel = spec.a11y
+            b.setContentHuggingPriority(.required, for: .horizontal)
+            b.setContentCompressionResistancePriority(.required, for: .horizontal)
+            rs.addArrangedSubview(b)
+        }
+
+        // chartControlView 안에 삽입
+        guard let host = self.chartControlView else {
+            assertionFailure("chartControlView is nil — connect the IBOutlet in Interface Builder.")
+            return
+        }
+        host.addSubview(rs)
+
+        // chartControlView 내부에 핀(상하좌우) — 레이아웃 안정
+        NSLayoutConstraint.activate([
+            rs.topAnchor.constraint(equalTo: host.topAnchor, constant: 0),
+            rs.bottomAnchor.constraint(equalTo: host.bottomAnchor, constant: 0),
+            rs.leadingAnchor.constraint(greaterThanOrEqualTo: host.leadingAnchor, constant: 8),
+            rs.trailingAnchor.constraint(lessThanOrEqualTo: host.trailingAnchor, constant: -8),
+            rs.centerXAnchor.constraint(equalTo: host.centerXAnchor)
+        ])
+
+        // 우선순위: 잘림 방지
+        rs.isLayoutMarginsRelativeArrangement = false
+        host.layoutMargins = .zero
+        rs.setContentHuggingPriority(.required, for: .vertical)
+        host.setContentCompressionResistancePriority(.required, for: .vertical)
+
+        self.rangeStack = rs
     }
 
     private func applyTheme() {
-        // 컨테이너들 둥글게
-        [topView, controlStack, containerView].forEach {
+        // 컨테이너 둥글게
+        [topView, controlStack, chartControlView].forEach {
             $0?.layer.cornerRadius = AppTheme.Corner.l
             $0?.layer.cornerCurve  = .continuous
             $0?.clipsToBounds = true
+            $0?.backgroundColor = AppTheme.Color.background
         }
 
         var cfg = UIButton.Configuration.plain()
         cfg.baseForegroundColor = AppTheme.Color.accent
         cfg.contentInsets = .init(top: 6, leading: 6, bottom: 6, trailing: 6)
         if dismissButton.currentImage == nil {
-            cfg.image = UIImage(systemName: "xmark.circle.fill")
+            cfg.image = UIImage(systemName: "xmark.square.fill")
         }
         dismissButton.configuration = cfg
         dismissButton.tintColor = AppTheme.Color.accent
 
         controlStack.spacing = 12
-        controlStack.backgroundColor = AppTheme.Color.background
+        chartControlView.setContentHuggingPriority(.required, for: .vertical)
+        chartControlView.setContentCompressionResistancePriority(.required, for: .vertical)
     }
-    
+
+    private let noDataLabel: UILabel = {
+        let l = UILabel()
+        l.translatesAutoresizingMaskIntoConstraints = false
+        l.numberOfLines = 0
+        l.textAlignment = .center
+        l.text = "No data available"
+        l.textColor = AppTheme.Color.main2.withAlphaComponent(0.9)
+        l.font = AppTheme.Font.secondaryBody
+        l.isHidden = true
+        return l
+    }()
+
     private func setNoDataVisible(_ show: Bool, message: String = "No data available") {
         noDataLabel.text = message
         noDataLabel.isHidden = !show
     }
 
     // MARK: - 액션
+    @IBAction func dismissButtonPressed(_ sender: UIButton) { dismiss(animated: true) }
+
     @objc private func modeTapped(_ sender: UIButton) {
         let newG: StatsGranularity = (sender.tag == 0) ? .month : .year
         guard newG != granularity else { return }
         granularity = newG
     }
 
+    @objc private func prevAnchorTapped()  { anchorDate = shiftAnchor(by: -1); updateTitle(); renderChart() }
+    @objc private func nextAnchorTapped()  { anchorDate = shiftAnchor(by: +1); updateTitle(); renderChart() }
+    @objc private func zoominRangeTapped() { // 축소
+        leftSpan  = max(minSpan, leftSpan - spanStep)
+        rightSpan = max(minSpan, rightSpan - spanStep)
+        renderChart()
+    }
+    @objc private func zoomoutRangeTapped() { // 확대
+        leftSpan  = min(maxSpan, leftSpan + spanStep)
+        rightSpan = min(maxSpan, rightSpan + spanStep)
+        renderChart()
+    }
+    @objc private func centerRangeTapped() {
+        anchorDate = periodStart(for: Date(), granularity: granularity)
+        updateTitle()
+        renderChart()
+    }
+    
     private func applyGranularityChange() {
         anchorDate = periodStart(for: Date(), granularity: granularity)
         updateModeButtons()
@@ -188,109 +282,141 @@ final class StatsVC: UIViewController {
     private func updateTitle() {
         titleLabel.text = provider?.title(for: anchorDate, granularity: granularity)
     }
+    
+    private func periodStart(for date: Date, granularity: StatsGranularity) -> Date {
+        switch granularity {
+        case .month: return monthStart(date)
+        case .year:  return yearStart(date)
+        }
+    }
 
     // MARK: - 차트 렌더링
     private func renderChart() {
         guard let provider = provider else {
-            chartView.configure(series: .init(startDate: Date(), step: 86_400, values: []), maxY: 1)
+            chartView.configure(series: .init(startDate: Date(), step: 86_400, values: []),
+                                maxY: 1,
+                                granularity: (granularity == .month ? .month : .year),
+                                calendar: cal)
+            axisOverlay.plotInset = chartView.plotInset
+            axisOverlay.configure(maxY: 1)
             setNoDataVisible(true)
             return
         }
 
-        let range   = interval(for: anchorDate, granularity: granularity)
-        var buckets = provider.stats(for: range, granularity: granularity)
+        // 1) 가로 윈도우 구성 (⚠️ 앵커 기준!)
+        let range = expandedInterval(for: anchorDate, granularity: granularity)
 
-        // 정렬 보장
-        buckets.sort { $0.periodStart < $1.periodStart }
+        // 2) 저장소에서 기본 버킷 가져오기 (저장+프로젝션 합산)
+        let buckets = provider.stats(for: range, granularity: .month) // day-bucket → 아래에서 월/연 합산
 
-        // === 1) step 결정 (month=일, year=월) ===
+        // 3) 월/년 막대 시리즈 만들기
+        let barStarts: [Date]
+        let values: [Double]
         let step: TimeInterval
+
         switch granularity {
         case .month:
-            step = 86_400 // 하루
-        case .year:
-            // "월 단위" step: anchorDate의 월 1일 기준으로 월 간격
-            // 차트는 균등 step이 필요하므로 30일로 근사해도 OK. 더 정확히 하려면 overlay에서 라벨만 월로, step은 30일 근사.
-            step = 86_400 * 30
-        }
-
-        // === 2) 버킷 맵으로 (periodStart -> amount) ===
-        let byStart = Dictionary(uniqueKeysWithValues: buckets.map { ($0.periodStart, $0.totalAmount) })
-
-        // === 3) 연속값 배열 생성 (빈 날/달은 0) ===
-        let denseValues: [Double] = {
-            var arr: [Double] = []
-            var t = range.start
-            while t < range.end {
-                // 같은 “버킷 키”를 만드는 규칙이 provider와 동일해야 합니다.
-                // - .month: day 시작(00:00)
-                // - .year: month 시작(1일 00:00) -> 여기선 anchorDate 기준 월 경계로 fetch되어 올 걸 가정
-                let key: Date
-                switch granularity {
-                case .month:
-                    key = cal.startOfDay(for: t)
-                case .year:
-                    let comp = cal.dateComponents([.year, .month], from: t)
-                    key = cal.date(from: comp)! // 월 시작
-                }
-                arr.append(byStart[key] ?? 0)
-                t = t.addingTimeInterval(step)
+            barStarts = monthsInRange(range)
+            let byDay = Dictionary(grouping: buckets, by: { startOfDay($0.periodStart) })
+            var byMonth: [Date: Double] = [:]
+            for (d, arr) in byDay {
+                let m = monthStart(d)
+                byMonth[m, default: 0] += arr.reduce(0) { $0 + $1.totalAmount }
             }
-            return arr
-        }()
-
-        // === 4) 비어있거나 전부 0 처리 ===
-        let hasEnough = denseValues.count >= 2
-        let allZero   = denseValues.allSatisfy { $0 == 0 }
-        guard hasEnough, !allZero else {
-            chartView.configure(series: .init(startDate: range.start, step: step, values: []), maxY: 1)
-            setNoDataVisible(true, message: "No data available")
-            axisOverlay.configure(seriesStart: range.start, step: step, count: 0, maxY: 1, granularity: granularity, calendar: cal)
-            return
+            values = barStarts.map { byMonth[$0] ?? 0 }
+            step = 86_400 * 30 // index 계산용
+        case .year:
+            barStarts = yearsInRange(range)
+            let byMonth = Dictionary(grouping: buckets, by: { monthStart($0.periodStart) })
+            var byYear: [Date: Double] = [:]
+            for (m, arr) in byMonth {
+                let y = yearStart(m)
+                byYear[y, default: 0] += arr.reduce(0) { $0 + $1.totalAmount }
+            }
+            values = barStarts.map { byYear[$0] ?? 0 }
+            step = 86_400 * 365
         }
 
-        // === 5) maxY 계산: 데이터기반 vs provider hint ===
-        let dataMax = denseValues.max() ?? 1
+        // 4) Y 상한/차트 구성
+        let dataMax = values.max() ?? 1
         let hinted  = provider.maxY(for: granularity)
         let maxY    = max(dataMax, hinted, 1)
 
-        chartView.pointsPerStep = (granularity == .month) ? 10 : 24
-        chartView.configure(
-            series: .init(startDate: range.start, step: step, values: denseValues),
-            maxY: maxY
-        )
-        setNoDataVisible(false)
-
-        // === 6) 축/라벨 오버레이 갱신 ===
+        // 화면에 꽉 차는 막대 폭/간격 산정
+        let bottomInset = xLabelsBottomInset()  // 폰트 높이 기반
+        chartView.plotInset = .init(top: 12, left: 0, bottom: bottomInset, right: 0)
         axisOverlay.plotInset = chartView.plotInset
-        axisOverlay.configure(
-            seriesStart: range.start,
-            step: step,
-            count: denseValues.count,
-            maxY: maxY,
-            granularity: granularity,
-            calendar: cal
-        )
+        
+
+        let plotWidth = max(0, chartView.bounds.width - (chartView.plotInset.left + chartView.plotInset.right))
+        let barCount  = max(values.count, 1)
+        let stepPx    = (barCount > 0) ? (plotWidth / CGFloat(barCount)) : plotWidth
+        let barW      = max(10, stepPx * 0.62)
+        let gap       = max(4, stepPx - barW)
+
+        chartView.barWidth = barW
+        chartView.barGap   = gap
+
+        chartView.configure(series: .init(startDate: barStarts.first ?? anchorDate, step: step, values: values),
+                            maxY: maxY,
+                            granularity: (granularity == .month ? .month : .year),
+                            calendar: cal)
+        axisOverlay.configure(maxY: maxY)
+        setNoDataVisible(values.allSatisfy { $0 == 0 })
+
+        // 기준선 = 앵커 막대(항상 leftSpan번째)
+        let anchorIndex = min(max(0, leftSpan), max(0, barStarts.count - 1))
+        chartView.highlightIndex = anchorIndex
+        axisOverlay.setReferenceX(nil)
+    }
+    private func xLabelsBottomInset() -> CGFloat {
+        // xLabelFont은 BarChartView가 가진 폰트 사용
+        let h = chartView.xLabelFont.lineHeight
+        // 라벨 높이 + 6pt 패딩, 최소 12 보장
+        return max(12, ceil(h) + 6)
     }
 
-    // MARK: - 보조
-    
-  
-    private func periodStart(for date: Date, granularity: StatsGranularity) -> Date {
+    // MARK: - 날짜 유틸
+    private func expandedInterval(for anchor: Date, granularity: StatsGranularity) -> DateInterval {
         switch granularity {
-        case .month: return cal.dateInterval(of: .month, for: date)!.start
-        case .year:  return cal.dateInterval(of: .year,  for: date)!.start
+        case .month:
+            let a0 = monthStart(anchor)
+            let start = cal.date(byAdding: .month, value: -leftSpan, to: a0)!
+            let end   = cal.date(byAdding: .month, value: rightSpan + 1, to: a0)! // [start, next-of-last)
+            return DateInterval(start: start, end: end)
+        case .year:
+            let a0 = yearStart(anchor)
+            let start = cal.date(byAdding: .year, value: -leftSpan, to: a0)!
+            let end   = cal.date(byAdding: .year, value: rightSpan + 1, to: a0)!
+            return DateInterval(start: start, end: end)
         }
     }
-    private func interval(for date: Date, granularity: StatsGranularity) -> DateInterval {
+
+    private func monthsInRange(_ r: DateInterval) -> [Date] {
+        var out: [Date] = []
+        var d = monthStart(r.start)
+        while d < r.end { out.append(d); d = cal.date(byAdding: .month, value: 1, to: d)! }
+        return out
+    }
+    private func yearsInRange(_ r: DateInterval) -> [Date] {
+        var out: [Date] = []
+        var d = yearStart(r.start)
+        while d < r.end { out.append(d); d = cal.date(byAdding: .year, value: 1, to: d)! }
+        return out
+    }
+    private func startOfDay(_ d: Date) -> Date { cal.startOfDay(for: d) }
+    private func monthStart(_ d: Date) -> Date { cal.date(from: cal.dateComponents([.year, .month], from: d))! }
+    private func yearStart(_ d: Date) -> Date  { cal.date(from: cal.dateComponents([.year], from: d))! }
+
+    private func shiftAnchor(by delta: Int) -> Date {
         switch granularity {
-        case .month: return cal.dateInterval(of: .month, for: date)!
-        case .year:  return cal.dateInterval(of: .year,  for: date)!
+        case .month: return cal.date(byAdding: .month, value: delta, to: anchorDate).map(monthStart(_:))!
+        case .year:  return cal.date(byAdding: .year,  value: delta, to: anchorDate).map(yearStart(_:))!
         }
     }
 }
 
-//MARK: - Bindo Repository Provider
+// MARK: - Bindo Repository Provider
 enum StatsGranularity: CaseIterable {
     case month, year
     var title: String { self == .month ? "Month" : "Year" }
@@ -308,11 +434,10 @@ protocol StatsProvider: AnyObject {
     func title(for start: Date, granularity: StatsGranularity) -> String
 }
 
-
 final class RepositoryStatsProvider: StatsProvider {
     private let repo: StatsRepository
     private let cal: Calendar
-    
+
     init(repo: StatsRepository, calendar: Calendar = .current) {
         self.repo = repo
         self.cal  = calendar
@@ -324,10 +449,7 @@ final class RepositoryStatsProvider: StatsProvider {
 
     // “권장 상한선” 역할. 필요하면 더 똑똑하게 계산해도 됨.
     func maxY(for granularity: StatsGranularity) -> Double {
-        switch granularity {
-        case .month: return 100
-        case .year:  return 1000
-        }
+        switch granularity { case .month: return 100; case .year: return 1000 }
     }
 
     func title(for start: Date, granularity: StatsGranularity) -> String {
@@ -337,4 +459,3 @@ final class RepositoryStatsProvider: StatsProvider {
         return df.string(from: start)
     }
 }
-

@@ -16,10 +16,10 @@ extension Occurence {
         return NSFetchRequest<Occurence>(entityName: "Occurence")
     }
 
-    @NSManaged public var amount: NSDecimalNumber?
-    @NSManaged public var date: Date?
+    @NSManaged public var endDate: Date?
     @NSManaged public var id: UUID?
-    @NSManaged public var isLocked: Bool
+    @NSManaged public var payAmount: NSDecimalNumber?
+    @NSManaged public var startDate: Date?
     @NSManaged public var bindo: Bindo?
 
 }

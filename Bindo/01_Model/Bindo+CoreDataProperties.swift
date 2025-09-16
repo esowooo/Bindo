@@ -16,16 +16,16 @@ extension Bindo {
         return NSFetchRequest<Bindo>(entityName: "Bindo")
     }
 
-    @NSManaged public var amount: NSDecimalNumber?
+    @NSManaged public var baseAmount: NSDecimalNumber?
     @NSManaged public var createdAt: Date?
+    @NSManaged public var endAt: Date?
     @NSManaged public var id: UUID?
-    @NSManaged public var intervalDays: Int16
-    @NSManaged public var intervalMonths: Int16
+    @NSManaged public var intervalDays: NSNumber?
+    @NSManaged public var intervalMonths: NSNumber?
     @NSManaged public var name: String?
     @NSManaged public var option: String?
     @NSManaged public var updatedAt: Date?
-    @NSManaged public var startDate: Date?
-    @NSManaged public var endDate: Date?
+    @NSManaged public var useBase: Bool
     @NSManaged public var occurrences: NSSet?
 
 }

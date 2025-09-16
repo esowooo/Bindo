@@ -151,9 +151,16 @@
                                         </connections>
                                     </button>
                                     <stackView opaque="NO" contentMode="scaleToFill" translatesAutoresizingMaskIntoConstraints="NO" id="pY9-WT-6BK">
-                                        <rect key="frame" x="15" y="496" width="331" height="49"/>
+                                        <rect key="frame" x="15" y="505" width="331" height="40"/>
                                         <color key="backgroundColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
+                                        <constraints>
+                                            <constraint firstAttribute="height" constant="40" id="VA5-tq-Itp"/>
+                                        </constraints>
                                     </stackView>
+                                    <view contentMode="scaleToFill" translatesAutoresizingMaskIntoConstraints="NO" id="cY9-x1-tSK" customClass="BarChartView" customModule="Bindo" customModuleProvider="target">
+                                        <rect key="frame" x="15" y="81" width="331" height="374"/>
+                                        <color key="backgroundColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
+                                    </view>
                                     <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="Title Label" textAlignment="center" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="ht6-La-jsU">
                                         <rect key="frame" x="120.66666666666666" y="35" width="120" height="21"/>
                                         <constraints>
@@ -163,21 +170,11 @@
                                         <nil key="textColor"/>
                                         <nil key="highlightedColor"/>
                                     </label>
-                                    <view contentMode="scaleToFill" translatesAutoresizingMaskIntoConstraints="NO" id="YAo-N0-0ie">
-                                        <rect key="frame" x="15" y="81" width="331" height="400"/>
-                                        <subviews>
-                                            <view contentMode="scaleToFill" translatesAutoresizingMaskIntoConstraints="NO" id="cY9-x1-tSK" customClass="ContinuousChartView" customModule="Bindo" customModuleProvider="target">
-                                                <rect key="frame" x="0.0" y="0.0" width="331" height="400"/>
-                                                <color key="backgroundColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
-                                            </view>
-                                        </subviews>
-                                        <color key="backgroundColor" name="Color1"/>
+                                    <view contentMode="scaleToFill" translatesAutoresizingMaskIntoConstraints="NO" id="BM8-fE-Q18">
+                                        <rect key="frame" x="15" y="460" width="331" height="40"/>
+                                        <color key="backgroundColor" systemColor="systemBackgroundColor"/>
                                         <constraints>
-                                            <constraint firstItem="cY9-x1-tSK" firstAttribute="leading" secondItem="YAo-N0-0ie" secondAttribute="leading" id="1mI-Ct-mdr"/>
-                                            <constraint firstAttribute="bottom" secondItem="cY9-x1-tSK" secondAttribute="bottom" id="4xo-Ih-CbC"/>
-                                            <constraint firstAttribute="trailing" secondItem="cY9-x1-tSK" secondAttribute="trailing" id="9TL-Pr-J1L"/>
-                                            <constraint firstItem="cY9-x1-tSK" firstAttribute="top" secondItem="YAo-N0-0ie" secondAttribute="top" id="9da-XN-dFK"/>
-                                            <constraint firstAttribute="height" constant="400" id="HWw-ld-FuC"/>
+                                            <constraint firstAttribute="height" constant="40" id="iWm-Ah-SaM"/>
                                         </constraints>
                                     </view>
                                 </subviews>
@@ -187,15 +184,18 @@
                                     <constraint firstItem="Yf3-xm-LCI" firstAttribute="top" secondItem="gfk-3V-Iql" secondAttribute="top" constant="5" id="5at-TE-fCr"/>
                                     <constraint firstItem="ht6-La-jsU" firstAttribute="centerX" secondItem="gfk-3V-Iql" secondAttribute="centerX" id="8Ia-h1-5Wd"/>
                                     <constraint firstItem="ht6-La-jsU" firstAttribute="top" secondItem="gfk-3V-Iql" secondAttribute="top" constant="35" id="8Xg-Z0-ztQ"/>
+                                    <constraint firstAttribute="trailing" secondItem="cY9-x1-tSK" secondAttribute="trailing" constant="15" id="Hic-7N-WGL"/>
                                     <constraint firstAttribute="trailing" secondItem="Yf3-xm-LCI" secondAttribute="trailing" constant="5" id="L1R-GP-IJD"/>
+                                    <constraint firstItem="cY9-x1-tSK" firstAttribute="leading" secondItem="gfk-3V-Iql" secondAttribute="leading" constant="15" id="L42-Yg-8G2"/>
                                     <constraint firstAttribute="width" constant="361" id="MkN-SI-XbY"/>
-                                    <constraint firstItem="YAo-N0-0ie" firstAttribute="leading" secondItem="gfk-3V-Iql" secondAttribute="leading" constant="15" id="Nz4-rY-mJx"/>
+                                    <constraint firstItem="cY9-x1-tSK" firstAttribute="top" secondItem="ht6-La-jsU" secondAttribute="bottom" constant="25" id="Mv1-4X-CQt"/>
+                                    <constraint firstItem="pY9-WT-6BK" firstAttribute="top" secondItem="BM8-fE-Q18" secondAttribute="bottom" constant="5" id="Uds-B2-58O"/>
                                     <constraint firstAttribute="height" constant="570" id="XsO-j2-rJj"/>
-                                    <constraint firstItem="YAo-N0-0ie" firstAttribute="top" secondItem="ht6-La-jsU" secondAttribute="bottom" constant="25" id="Yef-lx-2Gn"/>
-                                    <constraint firstAttribute="trailing" secondItem="YAo-N0-0ie" secondAttribute="trailing" constant="15" id="vJ5-zh-WH7"/>
+                                    <constraint firstItem="BM8-fE-Q18" firstAttribute="leading" secondItem="gfk-3V-Iql" secondAttribute="leading" constant="15" id="epB-aZ-Uki"/>
+                                    <constraint firstAttribute="trailing" secondItem="BM8-fE-Q18" secondAttribute="trailing" constant="15" id="oEA-Ui-6Pq"/>
                                     <constraint firstItem="pY9-WT-6BK" firstAttribute="leading" secondItem="gfk-3V-Iql" secondAttribute="leading" constant="15" id="wlA-Bv-NLB"/>
                                     <constraint firstAttribute="trailing" secondItem="pY9-WT-6BK" secondAttribute="trailing" constant="15" id="wm4-cT-61z"/>
-                                    <constraint firstItem="pY9-WT-6BK" firstAttribute="top" secondItem="YAo-N0-0ie" secondAttribute="bottom" constant="15" id="y8a-g3-ptn"/>
+                                    <constraint firstItem="BM8-fE-Q18" firstAttribute="top" secondItem="cY9-x1-tSK" secondAttribute="bottom" constant="5" id="yrF-SQ-HdH"/>
                                 </constraints>
                             </view>
                         </subviews>
@@ -207,8 +207,8 @@
                         </constraints>
                     </view>
                     <connections>
+                        <outlet property="chartControlView" destination="BM8-fE-Q18" id="B7E-4N-pGz"/>
                         <outlet property="chartView" destination="cY9-x1-tSK" id="yMr-pG-XLY"/>
-                        <outlet property="containerView" destination="YAo-N0-0ie" id="I55-9t-65w"/>
                         <outlet property="controlStack" destination="pY9-WT-6BK" id="hos-e4-BWo"/>
                         <outlet property="dismissButton" destination="Yf3-xm-LCI" id="D5M-I4-Fpp"/>
                         <outlet property="titleLabel" destination="ht6-La-jsU" id="Sdh-0l-NoO"/>
@@ -397,7 +397,7 @@
             <color white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
         </systemColor>
         <systemColor name="systemGray4Color">
-            <color red="0.81960784313725488" green="0.81960784313725488" blue="0.83921568627450982" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+            <color red="0.81960784310000001" green="0.81960784310000001" blue="0.83921568629999999" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
         </systemColor>
     </resources>
 </document>

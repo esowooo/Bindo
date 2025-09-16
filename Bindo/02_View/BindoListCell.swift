@@ -145,28 +145,37 @@ class BindoListCell: UITableViewCell {
     }
     
     
-    func setProgress(start: Date?, next: Date?, today: Date = Date()) {
+    func setProgress(start: Date?, next: Date?, endAt: Date?, today: Date = Date()) {
+        let cal = Calendar.current
+        let t = cal.startOfDay(for: today)
+
+        // endAt이 과거면 무조건 숨김
+        if let endAt, cal.startOfDay(for: endAt) < t {
+            progressView.isHidden = true
+            progressView.progress = 0
+            return
+        }
+
         guard let start, let next else {
             progressView.isHidden = true
             progressView.progress = 0
             return
         }
-        let cal = Calendar.current
+
         let s = cal.startOfDay(for: start)
         let n = cal.startOfDay(for: next)
-        let t = cal.startOfDay(for: today)
-        
+
         if n <= s {
-            // 비정상 구간 보호
+            // 비정상 구간 보호: 진행도 꽉 찬 상태로 표시 or 숨김 중 택1
             progressView.isHidden = false
             progressView.progress = 1
             return
         }
-        
-        let total = max(1, cal.dateComponents([.day], from: s, to: n).day ?? 0)
+
+        let total   = max(1, cal.dateComponents([.day], from: s, to: n).day ?? 0)
         let elapsed = min(max(0, cal.dateComponents([.day], from: s, to: t).day ?? 0), total)
-        let value = Float(elapsed) / Float(total)
-        
+        let value   = Float(elapsed) / Float(total)
+
         progressView.isHidden = false
         progressView.setProgress(value, animated: false)
     }

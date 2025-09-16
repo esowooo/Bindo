@@ -1,21 +1,20 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <model type="com.apple.IDECoreDataModeler.DataModel" documentVersion="1.0" lastSavedToolsVersion="23788.4" systemVersion="24G90" minimumToolsVersion="Automatic" sourceLanguage="Swift" usedWithSwiftData="YES" userDefinedModelVersionIdentifier="">
     <entity name="Bindo" representedClassName="Bindo" syncable="YES">
-        <attribute name="amount" attributeType="Decimal" defaultValueString="0.0"/>
+        <attribute name="baseAmount" optional="YES" attributeType="Decimal" defaultValueString="0.0"/>
         <attribute name="createdAt" attributeType="Date" usesScalarValueType="NO"/>
-        <attribute name="endDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="endAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="id" attributeType="UUID" usesScalarValueType="NO"/>
-        <attribute name="intervalDays" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
-        <attribute name="intervalMonths" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
-        <attribute name="name" optional="YES" attributeType="String"/>
+        <attribute name="intervalDays" optional="YES" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="intervalMonths" optional="YES" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="name" attributeType="String"/>
         <attribute name="option" attributeType="String"/>
-        <attribute name="startDate" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="updatedAt" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="useBase" attributeType="Boolean" usesScalarValueType="YES"/>
         <relationship name="occurrences" toMany="YES" deletionRule="Cascade" destinationEntity="Occurence" inverseName="bindo" inverseEntity="Occurence"/>
         <fetchIndex name="index_bindo_data">
             <fetchIndexElement property="createdAt" type="Binary" order="ascending"/>
             <fetchIndexElement property="name" type="Binary" order="ascending"/>
-            <fetchIndexElement property="amount" type="Binary" order="ascending"/>
         </fetchIndex>
         <uniquenessConstraints>
             <uniquenessConstraint>
@@ -24,18 +23,15 @@
         </uniquenessConstraints>
     </entity>
     <entity name="Occurence" representedClassName="Occurence" syncable="YES">
-        <attribute name="amount" optional="YES" attributeType="Decimal" defaultValueString="0.0"/>
-        <attribute name="date" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="endDate" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="id" attributeType="UUID" usesScalarValueType="NO"/>
-        <attribute name="isLocked" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
+        <attribute name="payAmount" attributeType="Decimal" defaultValueString="0.0"/>
+        <attribute name="startDate" attributeType="Date" usesScalarValueType="NO"/>
         <relationship name="bindo" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Bindo" inverseName="occurrences" inverseEntity="Bindo"/>
-        <fetchIndex name="idx_occurence_data">
-            <fetchIndexElement property="date" type="Binary" order="ascending"/>
-        </fetchIndex>
         <uniquenessConstraints>
             <uniquenessConstraint>
                 <constraint value="bindo"/>
-                <constraint value="date"/>
+                <constraint value="id"/>
             </uniquenessConstraint>
         </uniquenessConstraints>
     </entity>
