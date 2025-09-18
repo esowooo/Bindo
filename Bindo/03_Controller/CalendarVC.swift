@@ -15,7 +15,7 @@ public protocol CalendarEventSource: AnyObject {
 }
 
 
-class CalendarVC: UIViewController {
+class CalendarVC: BaseVC {
     
     //Outlets
     @IBOutlet weak var topView: UIView!
@@ -50,7 +50,7 @@ class CalendarVC: UIViewController {
     
     // Dependencies
     var eventSource: CalendarEventSource?
-
+    private let viewContext = Persistence.shared.viewContext
     
     //Properties
     private var currentMonth: Date = Date()  // 현재 표시 중인 월(아무 날짜든 OK)
@@ -79,7 +79,28 @@ class CalendarVC: UIViewController {
         
         // 스와이프 제스처로 달 전환
         addSwipeGestures()
-        
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(contextDidChange(_:)),
+            name: .NSManagedObjectContextObjectsDidChange,
+            object: viewContext
+        )
+    }
+    
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        reloadMonth(animated: false)
+    }
+    
+    deinit {
+        NotificationCenter.default.removeObserver(self,
+            name: .NSManagedObjectContextObjectsDidChange,
+            object: viewContext)
+    }
+    
+    @objc private func contextDidChange(_ note: Notification) {
+        // 현재 그리드 범위 안의 변경인지까지 필터링 가능하지만 우선 전체 리로드
+        reloadMonth(animated: false)
     }
     
     //Outlet Methods
@@ -360,7 +381,7 @@ final class RepoEventSource: CalendarEventSource {
 
 
 //MARK: - Calendar Event, Calendar Unit
-/// 캘린더에 표시할 이벤트(= 구독 Pay Day)
+/// 캘린더에 표시할 이벤트(= 구독 Payday)
 public struct CalendarEvent: Hashable {
     public let date: Date
     public let title: String   // 구독 이름

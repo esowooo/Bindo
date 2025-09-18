@@ -7,7 +7,7 @@
 
 import UIKit
 
-final class StatsVC: UIViewController {
+final class StatsVC: BaseVC {
     // MARK: - IBOutlets (스토리보드 연결)
     @IBOutlet weak var chartView: BarChartView!
     @IBOutlet weak var topView: UIView!
@@ -18,6 +18,7 @@ final class StatsVC: UIViewController {
 
     // MARK: - 주입
     var provider: StatsProvider?
+    private let viewContext = Persistence.shared.viewContext
 
     // MARK: - 상태
     private let cal = Calendar.current
@@ -55,6 +56,18 @@ final class StatsVC: UIViewController {
         anchorDate = periodStart(for: Date(), granularity: granularity)
         updateTitle()
         renderChart()
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(contextDidChange(_:)),
+            name: .NSManagedObjectContextObjectsDidChange,
+            object: viewContext
+        )
+    }
+    
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        updateTitle()
+        renderChart()
     }
 
     override func viewDidLayoutSubviews() {
@@ -64,6 +77,21 @@ final class StatsVC: UIViewController {
             lastLayoutSize = chartView.bounds.size
             renderChart()
         }
+    }
+    
+    
+    deinit {
+        NotificationCenter.default.removeObserver(self,
+            name: .NSManagedObjectContextObjectsDidChange,
+            object: viewContext)
+    }
+    
+    @objc private func contextDidChange(_ note: Notification) {
+        // 필요하면 provider 재생성(캐싱이 있다면)
+        if provider == nil {
+            provider = RepositoryStatsProvider(repo: CoreDataBindoRepository(context: viewContext))
+        }
+        renderChart()
     }
 
     // MARK: - UI 구성
@@ -197,6 +225,11 @@ final class StatsVC: UIViewController {
             $0?.clipsToBounds = true
             $0?.backgroundColor = AppTheme.Color.background
         }
+        
+        titleLabel.font = AppTheme.Font.secondaryTitle
+        titleLabel.textColor = AppTheme.Color.main1
+        titleLabel.textAlignment = .center
+        titleLabel.adjustsFontForContentSizeCategory = true
 
         var cfg = UIButton.Configuration.plain()
         cfg.baseForegroundColor = AppTheme.Color.accent
@@ -280,6 +313,7 @@ final class StatsVC: UIViewController {
     }
 
     private func updateTitle() {
+        
         titleLabel.text = provider?.title(for: anchorDate, granularity: granularity)
     }
     
@@ -341,10 +375,12 @@ final class StatsVC: UIViewController {
         let dataMax = values.max() ?? 1
         let hinted  = provider.maxY(for: granularity)
         let maxY    = max(dataMax, hinted, 1)
+        let displayMaxY = max(1, maxY * 1.02)
+
 
         // 화면에 꽉 차는 막대 폭/간격 산정
-        let bottomInset = xLabelsBottomInset()  // 폰트 높이 기반
-        chartView.plotInset = .init(top: 12, left: 0, bottom: bottomInset, right: 0)
+        let bottomInset = xLabelsBottomInset()
+        chartView.plotInset = .init(top: 14, left: 0, bottom: bottomInset, right: 0)
         axisOverlay.plotInset = chartView.plotInset
         
 
@@ -358,10 +394,10 @@ final class StatsVC: UIViewController {
         chartView.barGap   = gap
 
         chartView.configure(series: .init(startDate: barStarts.first ?? anchorDate, step: step, values: values),
-                            maxY: maxY,
+                            maxY: displayMaxY,
                             granularity: (granularity == .month ? .month : .year),
                             calendar: cal)
-        axisOverlay.configure(maxY: maxY)
+        axisOverlay.configure(maxY: displayMaxY)
         setNoDataVisible(values.allSatisfy { $0 == 0 })
 
         // 기준선 = 앵커 막대(항상 leftSpan번째)

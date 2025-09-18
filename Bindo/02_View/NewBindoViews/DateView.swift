@@ -14,7 +14,7 @@ final class OccurrenceRowView: UIView {
     var index: Int? {
         didSet {
             if let i = index {
-                occLabel.text = "Next Pay Day \(i)"
+                occLabel.text = "Next Payday \(i)"
                 occLabel.isHidden = false
             } else {
                 occLabel.isHidden = true
@@ -22,7 +22,7 @@ final class OccurrenceRowView: UIView {
         }
     }
     
-    private let occLabel = AppLabel("Next Pay Day ", style: .secondaryBody, tone: .main2)
+    private let occLabel = AppLabel("Next Payday ", style: .secondaryBody, tone: .main2)
     private let nextPicker = AppDatePicker(initial: Date())
     //Amount 필드 편집 가능 여부 제어
     var isAmountEditable: Bool = true {
@@ -98,7 +98,7 @@ final class OccurrenceRowView: UIView {
         // TitleRow
         rowStack.addArrangedSubview(titleRow)
 
-        // Next Pay Day Picker (단독 행)
+        // Next Payday Picker (단독 행)
         rowStack.addArrangedSubview(nextPicker)
 
         // Amount Row
@@ -229,7 +229,7 @@ final class DateView: UIView {
         return button
     }()
     private let copyAmountLabel = AppLabel(
-        "Use base amount for additional pay days",
+        "Use base amount for additional paydays",
         style: .secondaryBody,
         tone: .main2
     )
@@ -610,7 +610,7 @@ final class DateView: UIView {
         let df = DateView.dateFormatter
         
         var parts: [String] = []
-        parts.append("Pay Day(s): \(count)")
+        parts.append("Payday(s): \(count)")
         parts.append("Start: \(df.string(from: start))")
         if let e = lastNext { parts.append("End: \(df.string(from: e))") }
 
@@ -641,7 +641,7 @@ final class DateView: UIView {
 
         AppAlert.present(from: self,
                          title: "Confirm",
-                         message: "Do you want to overwrite all pay days amount with base amount?",
+                         message: "Do you want to overwrite all paydays amount with base amount?",
                          actions: [
                             .init(title: "Cancel", style: .cancel) { completion(false) },
                             .init(title: "OK", style: .primary) { completion(true) }
@@ -807,5 +807,46 @@ extension DateView: BindoForm {
         updateSummary()
         setNeedsLayout()
         layoutIfNeeded()
+    }
+}
+//MARK: - Update Bindo
+
+// DateView.swift
+extension DateView {
+    func apply(_ m: BindoList) {
+        nameField.text = m.name
+        startPicker.setDate(m.occurrences.first?.startDate ?? Date(), animated: false)
+
+        copyAmountEnabled = m.useBase
+        updateCopyAmountCheckboxIcon()
+
+        // occurrence 채우기
+        rows.forEach { $0.removeFromSuperview() }
+        rows.removeAll()
+
+        let sorted = m.occurrences.sorted(by: { $0.startDate < $1.startDate })
+        if let first = sorted.first {
+            baseRow.nextDate = first.endDate
+            if m.useBase {
+                baseRow.amount = m.baseAmount
+            } else {
+                baseRow.amount = first.payAmount
+            }
+        }
+
+        for (i, occ) in sorted.dropFirst().enumerated() {
+            let row = addRow()
+            row.index = i + 2
+            row.nextDate = occ.endDate
+            if m.useBase {
+                row.amount = m.baseAmount
+                row.isAmountEditable = false
+            } else {
+                row.amount = occ.payAmount
+                row.isAmountEditable = true
+            }
+        }
+
+        updateSummary()
     }
 }

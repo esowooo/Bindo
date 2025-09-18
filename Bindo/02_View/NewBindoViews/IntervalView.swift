@@ -22,7 +22,7 @@ final class IntervalView: UIView {
     private let bottomStack = UIStackView()
     private let summaryBadge = UIView()
     private let summaryLabel = AppLabel("Summary", style: .secondaryBody, tone: .main2)
-    private let summaryValue = AppLabel("Next Pay Day: --", style: .caption, tone: .label)
+    private let summaryValue = AppLabel("Next Payday: --", style: .caption, tone: .label)
     
     
     // MARK: - UI 구성요소
@@ -50,6 +50,11 @@ final class IntervalView: UIView {
         f.dateFormat = "yyyy.MM.dd"
         return f
     }()
+    // Start 섹션 오른쪽 체크박스 + 라벨
+    private let includeRow   = UIStackView()
+    private let includeBtn   = UIButton(type: .system)
+    private let includeLabel = AppLabel("Include as Payday", style: .secondaryBody, tone: .main2)
+    
     
     // 구분선
     private let sep1 = AppSeparator()
@@ -60,9 +65,9 @@ final class IntervalView: UIView {
     // 내부 상태
     private var intervalValue: Int = 1
     private var intervalUnit: IntervalUnit = .months
-    
     private var unitWidthC: NSLayoutConstraint?
     private var valueWidthC: NSLayoutConstraint?
+    private var includeTodayAsPayday: Bool = false
     
     // IntervalUnit: 내부 표현 (week/year도 지원 → days/months로 매핑)
     private enum IntervalUnit: Int, CaseIterable {
@@ -108,7 +113,22 @@ final class IntervalView: UIView {
         didBuildUI = true
         
         backgroundColor = .clear
+        // includeRow(체크박스 + 텍스트)
+        includeRow.axis = .horizontal
+        includeRow.alignment = .center
+        includeRow.spacing = 6
+
+        var cbCfg = UIButton.Configuration.plain()
+        cbCfg.contentInsets = .zero
+        cbCfg.image = UIImage(systemName: "square")
+        cbCfg.baseForegroundColor = .systemGray2
+        includeBtn.configuration = cbCfg
+        includeBtn.setPreferredSymbolConfiguration(.init(pointSize: 14, weight: .semibold),
+                                                   forImageIn: .normal)
+        includeLabel.textColor = .systemGray2
         
+        let startHeaderRow = UIStackView()
+        let startSpacer = UIView()
         
         // ─────────────────────────────────────
         // 1) 뷰 계층 설정
@@ -138,6 +158,15 @@ final class IntervalView: UIView {
         // 스크롤 콘텐츠 루트
         scrollView.addSubview(root)
         
+        // includeRow 구성요소 부착
+        includeRow.addArrangedSubview(includeBtn)
+        includeRow.addArrangedSubview(includeLabel)
+
+        // 헤더 조립
+        startHeaderRow.addArrangedSubview(startLabel)
+        startHeaderRow.addArrangedSubview(startSpacer)
+        startHeaderRow.addArrangedSubview(includeRow)
+        
         // ─────────────────────────────────────
         // 2) 기본 스타일 적용
         // ─────────────────────────────────────
@@ -151,6 +180,13 @@ final class IntervalView: UIView {
         scrollView.showsHorizontalScrollIndicator = false
         scrollView.keyboardDismissMode = .interactive
         
+        // Include Start
+        startHeaderRow.axis = .horizontal
+        startHeaderRow.alignment = .center
+        startHeaderRow.distribution = .fill
+        startHeaderRow.spacing = 8
+        startSpacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        startSpacer.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         
         // Bottom Bar
         bottomBar.translatesAutoresizingMaskIntoConstraints = false
@@ -300,7 +336,7 @@ final class IntervalView: UIView {
         root.addArrangedSubview(intervalWrap)
         root.addArrangedSubview(sep3)
         
-        root.addArrangedSubview(startLabel)
+        root.addArrangedSubview(startHeaderRow)
         root.addArrangedSubview(startPicker)
         root.addArrangedSubview(sep4)
         
@@ -394,6 +430,10 @@ final class IntervalView: UIView {
             let rectInScroll = target.convert(target.bounds, to: self.scrollView)
             self.scrollView.scrollRectToVisible(rectInScroll.insetBy(dx: 0, dy: -12), animated: true)
         }
+        includeBtn.addTarget(self, action: #selector(toggleIncludeToday), for: .touchUpInside)
+        let includeTap = UITapGestureRecognizer(target: self, action: #selector(toggleIncludeToday))
+        includeLabel.isUserInteractionEnabled = true
+        includeLabel.addGestureRecognizer(includeTap)
     }
     
     @objc private func toggleEndDate() {
@@ -415,6 +455,50 @@ final class IntervalView: UIView {
                 self.scrollView.scrollRectToVisible(rectInScroll.insetBy(dx: 0, dy: -12), animated: true)
             }
         })
+        updateNextPayLabel()
+    }
+    @objc private func toggleIncludeToday() {
+        includeTodayAsPayday.toggle()
+        let on = includeTodayAsPayday
+
+        let newImageName = on ? "checkmark.square.fill" : "square"
+        let newTint: UIColor = on ? AppTheme.Color.accent : .systemGray2
+
+        // 살짝 눌렀다 튕기는 느낌
+        let pop: CGFloat = 0.96
+        includeBtn.transform = .identity
+        UIView.animate(withDuration: 0.08, animations: {
+            self.includeBtn.transform = CGAffineTransform(scaleX: pop, y: pop)
+        }, completion: { _ in
+            UIView.animate(withDuration: 0.18,
+                           delay: 0,
+                           usingSpringWithDamping: 0.9,
+                           initialSpringVelocity: 0,
+                           options: [.allowUserInteraction],
+                           animations: {
+                self.includeBtn.transform = .identity
+            })
+        })
+
+        // 아이콘/컬러는 크로스디졸브로 전환
+        UIView.transition(with: includeBtn,
+                          duration: 0.18,
+                          options: .transitionCrossDissolve,
+                          animations: {
+            var cfg = self.includeBtn.configuration ?? .plain()
+            cfg.image = UIImage(systemName: newImageName)
+            cfg.baseForegroundColor = newTint
+            self.includeBtn.configuration = cfg
+            self.includeBtn.tintColor = newTint
+        })
+
+        UIView.transition(with: includeLabel,
+                          duration: 0.18,
+                          options: .transitionCrossDissolve,
+                          animations: {
+            self.includeLabel.textColor = newTint
+        })
+
         updateNextPayLabel()
     }
     
@@ -440,6 +524,17 @@ final class IntervalView: UIView {
         let end: Date? = endPicker.isHidden ? nil : endPicker.date
         let interval = buildInterval()
         
+        if includeTodayAsPayday {
+            // 체크 시: 첫 급여일은 start 자체
+            let nextText = dateFormatter.string(from: start)
+            var parts: [String] = ["Next Payday: \(nextText)"]
+            if let end = end {
+                parts.append("End: \(dateFormatter.string(from: end))")
+            }
+            summaryValue.text = parts.joined(separator: "   /   ")
+            return
+        }
+        
         // 다음 결제일 계산
         if let next = BindoCalculator.nextPayDay(afterOrOn: Date(),
                                                  start: start,
@@ -447,7 +542,7 @@ final class IntervalView: UIView {
                                                  end: end,
                                                  calendar: .current) {
             let nextText = dateFormatter.string(from: next)
-            var parts: [String] = ["Next Pay Day: \(nextText)"]
+            var parts: [String] = ["Next Payday: \(nextText)"]
             
             // 유저가 End Date를 보이도록 설정했으면 요약에 함께 표기
             if let end = end {
@@ -460,9 +555,9 @@ final class IntervalView: UIView {
             // 계산 불가 시
             if let end = end {
                 let endText = dateFormatter.string(from: end)
-                summaryValue.text = "Next Pay Day: --   /   End: \(endText)"
+                summaryValue.text = "Next Payday: --   /   End: \(endText)"
             } else {
-                summaryValue.text = "Next Pay Day: --"
+                summaryValue.text = "Next Payday: --"
             }
         }
     }
@@ -520,17 +615,20 @@ extension IntervalView: BindoForm {
             throw BindoFormError.inferredIntervalUnsupported
         }
         
-        // 검증 3: 첫 사이클 종료가 endAt을 초과하면 저장 금지 (endAt 포함 규칙)
         let cal = Calendar.current
-            let firstEndPreview = computeEndDate(start: start, interval: interval, calendar: cal)
-            if let endAt, cal.startOfDay(for: firstEndPreview) > cal.startOfDay(for: endAt) {
-                self.shake(); _ = presentInfo("Invalid Interval",
-                                              "First pay day will be \(dateFormatter.string(from: firstEndPreview)) which exceeds End Date.")
-                throw BindoFormError.incorrectInterval // 없으면 inferredIntervalUnsupported 로 대체
-            }
+        let firstEndPreview: Date = includeTodayAsPayday
+            ? cal.startOfDay(for: start)
+            : computeEndDate(start: start, interval: interval, calendar: cal)
+        
+        // 검증 3: 첫 사이클 종료가 endAt을 초과하면 저장 금지 (endAt 포함 규칙)
+        if let endAt, cal.startOfDay(for: firstEndPreview) > cal.startOfDay(for: endAt) {
+            self.shake(); _ = presentInfo("Invalid Interval",
+                                          "First payday will be \(dateFormatter.string(from: firstEndPreview)) which exceeds End Date.")
+            throw BindoFormError.incorrectInterval
+        }
         
         // ③ 첫 Occurence 생성
-        let firstEnd = computeEndDate(start: start, interval: interval)
+        let firstEnd = firstEndPreview
         let firstOcc = OccurrenceList(
             id: UUID(),
             startDate: start,
@@ -592,6 +690,13 @@ extension IntervalView: BindoForm {
         cfg.baseForegroundColor = AppTheme.Color.accent
         endToggleButton.configuration = cfg
         
+        includeTodayAsPayday = false
+        var cfg2 = includeBtn.configuration ?? .plain()
+        cfg2.image = UIImage(systemName: "square")
+        cfg2.baseForegroundColor = .systemGray2
+        includeBtn.configuration = cfg2
+        includeLabel.textColor = .systemGray2
+        
         // interval 기본값
         intervalValuePD.select(index: 0, emit: false) // 1
         if let monthsIndex = IntervalView.IntervalUnit.allCases.firstIndex(of: .months) {
@@ -606,4 +711,60 @@ extension IntervalView: BindoForm {
     }
     
     
+}
+
+
+//MARK: - Update Bindo
+// IntervalView.swift
+extension IntervalView {
+    func apply(_ m: BindoList) {
+        nameField.text = m.name
+        amountField.text = m.baseAmount.map { NumberFormatter().string(from: $0 as NSDecimalNumber) } ?? ""
+
+        startPicker.setDate(m.occurrences.first?.startDate ?? Date(), animated: false)
+        if let endAt = m.endAt {
+            endPicker.setDate(endAt, animated: false)
+            endPicker.isHidden = false
+            var cfg = endToggleButton.configuration ?? .plain()
+            cfg.image = UIImage(systemName: "minus.circle")
+            cfg.baseForegroundColor = AppTheme.Color.main2
+            endToggleButton.configuration = cfg
+        } else {
+            endPicker.isHidden = true
+        }
+        
+        // Checkbox
+        if let first = m.occurrences.first, Calendar.current.isDate(first.startDate, inSameDayAs: first.endDate) {
+            includeTodayAsPayday = true
+            var cfg = includeBtn.configuration ?? .plain()
+            cfg.image = UIImage(systemName: "checkmark.square.fill")
+            cfg.baseForegroundColor = AppTheme.Color.accent
+            includeBtn.configuration = cfg
+            includeLabel.textColor = AppTheme.Color.accent
+        }
+
+        // interval 값 복원
+        switch m.interval {
+        case .months(let mm):
+            if let idx = IntervalUnit.allCases.firstIndex(of: .months) {
+                intervalUnitPD.select(index: idx, emit: false)
+            }
+            intervalValuePD.select(index: mm - 1, emit: false)
+        case .days(let dd):
+            if dd % 7 == 0 {
+                if let idx = IntervalUnit.allCases.firstIndex(of: .weeks) {
+                    intervalUnitPD.select(index: idx, emit: false)
+                }
+                intervalValuePD.select(index: (dd / 7) - 1, emit: false)
+            } else {
+                if let idx = IntervalUnit.allCases.firstIndex(of: .days) {
+                    intervalUnitPD.select(index: idx, emit: false)
+                }
+                intervalValuePD.select(index: dd - 1, emit: false)
+            }
+        case .none:
+            break
+        }
+        updateNextPayLabel()
+    }
 }

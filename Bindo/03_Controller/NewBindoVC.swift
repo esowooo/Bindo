@@ -1,5 +1,5 @@
 //
-//  UpdateBindoVC.swift
+//  ReviewBindoVC.swift
 //  Bindo
 //
 //  Created by Sean Choi on 9/9/25.
@@ -33,7 +33,7 @@ enum BindoChildView: Int, CaseIterable {
 
 
 // MARK: - 컨테이너 VC
-final class UpdateBindoVC: UIViewController {
+final class NewBindoVC: BaseVC {
     
     // MARK: - UI
     @IBOutlet private weak var headView: UIView!
@@ -44,8 +44,8 @@ final class UpdateBindoVC: UIViewController {
     
     // MARK: - 데이터/의존성
     var editingID: UUID?
-    private let repo: BindoRepository = CoreDataBindoRepository()
-    
+    var repo: (BindoRepository & RefreshRepository)?
+    private var editingModel: BindoList?
     
     private lazy var childViews: [UIView] = [
         IntervalView(),
@@ -60,12 +60,21 @@ final class UpdateBindoVC: UIViewController {
     // MARK: - Lifecycle
     override func viewDidLoad() {
         super.viewDidLoad()
-        if let id = editingID, let _ = try? repo.fetch(id: id) {
-            // TODO: 폼에 model 주입(Interval/DateView 각각의 setValue 계열 구현 필요)
+        let repo = self.repo ?? CoreDataBindoRepository()
+
+        if let id = editingID, let b = try? repo.fetch(id: id) {
+            editingModel = b
+            // 생성 뷰 결정 (interval/date)
+            if b.option.lowercased() == "date" {
+                currentView = .date
+            } else {
+                currentView = .interval
+            }
+        } else {
+            currentView = .interval
         }
-        currentView = .interval
         applyAppearance()
-        performSwitch(to: .interval)
+        performSwitch(to: currentView)
     }
     
     override func viewDidLayoutSubviews() {
@@ -119,15 +128,29 @@ final class UpdateBindoVC: UIViewController {
         titleField.setItems(items)
         titleField.select(index: currentView.rawValue, emit: false)
 
-        // 선택 콜백 → 화면 전환
+        // 선택 콜백 → 화면 전환 (편집 모드면 차단 + Alert)
         titleField.onSelect = { [weak self] idx, _ in
             guard let self, let kind = BindoChildView(rawValue: idx) else { return }
-            self.titleField.select(index: self.currentView.rawValue, emit: false)
+
+            // 편집 중에는 전환 금지: 선택 되돌리고 Alert만
+            if self.editingModel != nil, kind != self.currentView {
+                self.titleField.select(index: self.currentView.rawValue, emit: false)
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                AppAlert.info(
+                    on: self,
+                    title: "Not Allowed",
+                    message: "Can't change type for existing bindo."
+                )
+                return
+            }
+
+            // 신규 작성일 때만 전환
             self.requestSwitch(to: kind)
         }
 
         // 네비 타이틀에 장착 + 최소 사이즈
         navigationItem.titleView = titleField
+
     }
     
     
@@ -176,6 +199,13 @@ final class UpdateBindoVC: UIViewController {
     
     // 실제 전환: 제약 정리 → 새 뷰 부착
     private func performSwitch(to newKind: BindoChildView) {
+        // 이중 방어: 편집 모드에선 타입 전환 차단
+        if editingModel != nil, newKind != currentView {
+            titleField.select(index: currentView.rawValue, emit: false)
+            return
+        }
+
+
         currentView = newKind
         let next = childViews[newKind.rawValue]
 
@@ -186,7 +216,7 @@ final class UpdateBindoVC: UIViewController {
             }
         }
 
-        // 1) 이전 제약 해제 & 제거 (old 참조 유지)
+        // 1) 이전 제약 해제 & 제거
         let old = current
         NSLayoutConstraint.deactivate(currentConstraints)
         currentConstraints.removeAll()
@@ -196,7 +226,7 @@ final class UpdateBindoVC: UIViewController {
         next.translatesAutoresizingMaskIntoConstraints = false
         containerView.addSubview(next)
 
-        // 3) 새 제약 생성/적용  ← 오타 수정: containerView.trailingAnchor
+        // 3) 새 제약
         let cs: [NSLayoutConstraint] = [
             next.leadingAnchor.constraint(equalTo: containerView.leadingAnchor),
             next.trailingAnchor.constraint(equalTo: containerView.trailingAnchor),
@@ -207,14 +237,26 @@ final class UpdateBindoVC: UIViewController {
         currentConstraints = cs
         current = next
 
-        // 4) 타이틀 커밋(지연 커밋 유지)
+        // 4) 타이틀 커밋
         titleField.select(index: newKind.rawValue, emit: false)
 
-        // 5) 살짝 애니메이션
+        // 5) 애니메이션
         if old == nil {
             view.layoutIfNeeded()
         } else {
             next.slideFadeIn(offsetY: 50, duration: 0.25)
+        }
+
+        // 6) 편집 모델 주입 + 스냅샷 갱신
+        if let model = editingModel {
+            if let v = next as? IntervalView {
+                v.apply(model)
+            } else if let v = next as? DateView {
+                v.apply(model)
+            }
+            if let form = next as? BindoForm {
+                snapshots[newKind] = form.dirtySignature()
+            }
         }
     }
 
@@ -227,10 +269,10 @@ final class UpdateBindoVC: UIViewController {
             return
         }
         do {
-            var model = try form.buildModel() // IntervalView가 첫 Occ 포함해서 반환
+            var model = try form.buildModel()
+            let repo = self.repo ?? CoreDataBindoRepository()
 
             if let id = editingID, let existing = try? repo.fetch(id: id) {
-                // 🔒 option 변경 금지
                 let oldOpt = existing.option.lowercased()
                 let newOpt = model.option.lowercased()
                 if oldOpt != newOpt {
@@ -240,25 +282,38 @@ final class UpdateBindoVC: UIViewController {
                     return
                 }
 
-                // 편집: id/createdAt 유지, updatedAt만 today로 갱신
                 model = BindoList(
                     id: existing.id,
                     name: model.name,
                     useBase: model.useBase,
                     baseAmount: model.baseAmount,
-                    createdAt: existing.createdAt,  // 보존
-                    updatedAt: Date(),              // 갱신
+                    createdAt: existing.createdAt,
+                    updatedAt: Date(),
                     endAt: model.endAt,
-                    option: existing.option,        // 보존
+                    option: existing.option,
                     interval: model.interval,
-                    occurrences: model.occurrences  // 폼에서 온 첫 Occ(필요 시 교체)
+                    occurrences: model.occurrences
                 )
             }
 
             try repo.upsert(model)
-            cancelTapped()
+
+            // 저장 후에는 Review로 돌아가지 않고 메인으로 이동
+            popToMain()
+
         } catch {
             AppAlert.info(on: self, title: "Invalid", message: error.localizedDescription)
+        }
+    }
+    private func popToMain() {
+        guard let nav = navigationController else {
+            dismiss(animated: true)
+            return
+        }
+        if let main = nav.viewControllers.first(where: { $0 is MainVC }) {
+            nav.popToViewController(main, animated: true)
+        } else {
+            nav.popToRootViewController(animated: true)
         }
     }
     
@@ -271,3 +326,5 @@ final class UpdateBindoVC: UIViewController {
     }
     
 }
+
+

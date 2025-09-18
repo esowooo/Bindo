@@ -28,13 +28,19 @@ final class BarChartView: UIView {
     var barWidth: CGFloat = 22 { didSet { setNeedsDisplay() } }
     var barGap: CGFloat   = 14 { didSet { setNeedsDisplay() } }
     var barCorner: CGFloat = 6
-    var fillColor: UIColor = AppTheme.Color.main1.withAlphaComponent(0.22)
+    var fillColor: UIColor = AppTheme.Color.main1.withAlphaComponent(0.18)
     var lineColor: UIColor = AppTheme.Color.main1
     var xLabelFont: UIFont = AppTheme.Font.caption
     var xLabelColor: UIColor = AppTheme.Color.main2
     var highlightIndex: Int? { didSet { setNeedsDisplay() } }
-    var highlightFillColor: UIColor = AppTheme.Color.accent.withAlphaComponent(0.35)
+    var highlightFillColor: UIColor = AppTheme.Color.accent.withAlphaComponent(0.30)
     var highlightLineColor: UIColor = AppTheme.Color.accent
+    var showsHighlightValue: Bool = true { didSet { setNeedsDisplay() } }
+    var valueFont: UIFont = AppTheme.Font.caption
+    var valueTextColor: UIColor = AppTheme.Color.accent
+    var valueBubbleColor: UIColor = AppTheme.Color.background
+    var valueBubbleStrokeColor: UIColor = AppTheme.Color.accent
+    var valueBubbleStrokeWidth: CGFloat = 1
 
     // MARK: - Data
     private var series: Series?
@@ -53,6 +59,12 @@ final class BarChartView: UIView {
         self.granularity = granularity
         self.calendar = calendar
         setNeedsDisplay()
+    }
+    private func formatValue(_ v: Double) -> String {
+        if v >= 1_000_000 { return String(format: "%.1fm", v / 1_000_000) }
+        if v >= 1_000     { return String(format: "%.1fk", v / 1_000) }
+        if v == floor(v)  { return String(format: "%.0f", v) }
+        return String(format: "%.2f", v)
     }
 
     /// 특정 막대 인덱스의 X(뷰 좌표, 막대 중앙) — 기준선 위치 계산용
@@ -108,7 +120,46 @@ final class BarChartView: UIView {
             ctx.addPath(path.cgPath)
             ctx.strokePath()
         }
-
+        
+        if showsHighlightValue, let hi = highlightIndex, (0..<values.count).contains(hi) {
+            let v = max(0, values[hi])
+            // 막대 rect 함수는 기존 그대로 사용
+            let H = max(1, plot.height)
+            let h = CGFloat(v / max(maxY, 1)) * H
+            let x = startX + CGFloat(hi) * step
+            let r = CGRect(x: x, y: plot.maxY - h, width: barWidth, height: h)
+            
+            let text = formatValue(v)
+            let attrs: [NSAttributedString.Key: Any] = [
+                .font: valueFont,
+                .foregroundColor: valueTextColor
+            ]
+            let size = (text as NSString).size(withAttributes: attrs)
+            let padH: CGFloat = 6
+            let padV: CGFloat = 3
+            // 기본 위치: 막대 상단 6pt 위
+            var bubbleY = r.minY - size.height - 6 - 2*padV
+            // 플롯 꼭대기에 닿으면 안쪽으로 내림
+            let minY = plot.minY + 2
+            if bubbleY < minY { bubbleY = minY }
+            
+            let bubbleW = size.width + 2*padH
+            let bubbleH = size.height + 2*padV
+            let bubbleX = r.midX - bubbleW/2
+            let bubble = CGRect(x: bubbleX, y: bubbleY, width: bubbleW, height: bubbleH)
+            
+            let path = UIBezierPath(roundedRect: bubble, cornerRadius: bubbleH/2)
+            ctx.setFillColor(valueBubbleColor.cgColor)
+            ctx.addPath(path.cgPath)
+            ctx.fillPath()
+            ctx.setStrokeColor(valueBubbleStrokeColor.cgColor)
+            ctx.setLineWidth(valueBubbleStrokeWidth)
+            ctx.addPath(path.cgPath)
+            ctx.strokePath()
+            
+            (text as NSString).draw(at: CGPoint(x: bubble.minX + padH, y: bubble.minY + padV), withAttributes: attrs)
+        }
+        
         // 클리핑 해제
         ctx.restoreGState()
 
@@ -153,6 +204,7 @@ final class AxisOverlayView: UIView {
     private let gridColor = AppTheme.Color.main3.withAlphaComponent(0.2)
     private let labelColor = AppTheme.Color.main2
     private let labelFont  = AppTheme.Font.caption
+    private let labelEdgePadding: CGFloat = 2
 
     // 데이터 주입
     func configure(maxY: Double) {
@@ -182,22 +234,29 @@ final class AxisOverlayView: UIView {
 
         // Y 그리드
         let ticks = niceTicks(min: 0, max: maxY, tickCount: 5)
-        ctx.setStrokeColor(gridColor.cgColor)
-        ctx.setLineWidth(0.5)
-        for t in ticks {
-            let y = plot.maxY - CGFloat(t / maxY) * plot.height
-            ctx.move(to: CGPoint(x: plot.minX, y: y))
-            ctx.addLine(to: CGPoint(x: plot.maxX, y: y))
-        }
-        ctx.strokePath()
+           for t in ticks {
+               let y = plot.maxY - CGFloat(t / maxY) * plot.height
+               let text = yLabel(for: t)
+               let attrs: [NSAttributedString.Key: Any] = [
+                   .font: labelFont,
+                   .foregroundColor: labelColor
+               ]
+               let size = (text as NSString).size(withAttributes: attrs)
+               // 라벨이 완전히 보이는지 검사 (위·아래 경계)
+               let labelMinY = y - size.height / 2
+               let labelMaxY = y + size.height / 2
+               let safeTop   = plot.minY + labelEdgePadding
+               let safeBot   = plot.maxY - labelEdgePadding
 
-        // Y 라벨 (축 안쪽, "| 10k" 느낌)
-        for t in ticks {
-            let y = plot.maxY - CGFloat(t / maxY) * plot.height
-            drawLabel(text: yLabel(for: t),
-                      at: CGPoint(x: plot.minX + 4, y: y),
-                      anchor: .leftCenter)
-        }
+               guard labelMinY >= safeTop, labelMaxY <= safeBot else {
+                   // 경계에 걸리면 그리지 않음
+                   continue
+               }
+
+               drawLabel(text: text,
+                         at: CGPoint(x: plot.minX + 4, y: y),
+                         anchor: .leftCenter)
+           }
     }
 
     // MARK: - Utils
