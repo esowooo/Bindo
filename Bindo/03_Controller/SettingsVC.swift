@@ -28,18 +28,30 @@ final class SettingsVC: BaseVC {
     private let exportButton      = UIButton(type: .system)
     private let claimButton       = UIButton(type: .system)
     
+    private lazy var outsideTapGR: UITapGestureRecognizer = {
+        let g = UITapGestureRecognizer(target: self, action: #selector(handleOutsideTap(_:)))
+        g.cancelsTouchesInView = false
+        g.delegate = self
+        return g
+    }()
+    
+
+    
     // MARK: - Lifecycle
     override func viewDidLoad() {
         super.viewDidLoad()
         configureUI()
         loadSettingsIntoUI()
         bindSettingsActions()
+        view.addGestureRecognizer(outsideTapGR)
     }
     
     // MARK: - Actions
     @IBAction func dismissButtonPressed(_ sender: UIButton) {
         dismiss(animated: true)
     }
+    
+    
     // MARK: - Setup
     private func configureUI() {
         buildBaseLayout()
@@ -336,6 +348,28 @@ final class SettingsVC: BaseVC {
     }
     
 }
+    
+    //MARK: - Gesture
+extension SettingsVC: UIGestureRecognizerDelegate {
+    @objc private func handleOutsideTap(_ g: UITapGestureRecognizer) {
+        guard g.state == .ended else { return }
+        guard presentedViewController == nil, !isBeingDismissed else { return }
+
+        let p = g.location(in: view)
+        // topView 바깥이면 닫기
+        if !topView.frame.contains(p) {
+            dismiss(animated: true)
+        }
+    }
+        
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
+                           shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+        return true
+    }
+}
+    
+
+    
 
 
 

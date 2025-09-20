@@ -65,6 +65,13 @@ class CalendarVC: BaseVC {
     private let hSpacing: CGFloat = 6    // 열 사이 간격
     private let vSpacing: CGFloat = 10  // 행 사이 간격
     
+    private lazy var outsideTapGR: UITapGestureRecognizer = {
+        let g = UITapGestureRecognizer(target: self, action: #selector(handleOutsideTap(_:)))
+        g.cancelsTouchesInView = false
+        g.delegate = self
+        return g
+    }()
+    
     //Lifecycle
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -76,9 +83,9 @@ class CalendarVC: BaseVC {
         wireEvents()
         setupCollection()
         reloadMonth(animated: false)
-        
-        // 스와이프 제스처로 달 전환
         addSwipeGestures()
+        view.addGestureRecognizer(outsideTapGR)
+
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(contextDidChange(_:)),
@@ -192,6 +199,8 @@ class CalendarVC: BaseVC {
 
     // (옵션) 타이틀 라벨 탭도 허용했을 때
     @objc private func jumpToCurrentMonthViaTap() { jumpToCurrentMonth() }
+    
+    
     
     // MARK: - Data
     private func shiftMonth(by delta: Int) {
@@ -366,6 +375,24 @@ extension CalendarVC: UICollectionViewDataSource, UICollectionViewDelegateFlowLa
 }
 
 
+extension CalendarVC: UIGestureRecognizerDelegate {
+    @objc private func handleOutsideTap(_ g: UITapGestureRecognizer) {
+        guard g.state == .ended else { return }
+        guard presentedViewController == nil, !isBeingDismissed else { return }
+
+        let p = g.location(in: view)
+        if !topView.frame.contains(p) {
+            dismiss(animated: true)
+        }
+    }
+
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
+                           shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+        return true
+    }
+}
+
+
 
 //MARK: - Bindo Repository Adaptor
 final class RepoEventSource: CalendarEventSource {
@@ -445,3 +472,4 @@ enum CalendarUtils {
         cal.isDate(a, inSameDayAs: b)
     }
 }
+

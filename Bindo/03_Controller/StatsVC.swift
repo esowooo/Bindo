@@ -30,6 +30,12 @@ final class StatsVC: BaseVC {
         v.translatesAutoresizingMaskIntoConstraints = false
         return v
     }()
+    private lazy var outsideTapGR: UITapGestureRecognizer = {
+        let g = UITapGestureRecognizer(target: self, action: #selector(handleOutsideTap(_:)))
+        g.cancelsTouchesInView = false
+        g.delegate = self
+        return g
+    }()
 
     // 범위 제어(좌/우 스팬)
     private var leftSpan: Int  = 3
@@ -56,6 +62,8 @@ final class StatsVC: BaseVC {
         anchorDate = periodStart(for: Date(), granularity: granularity)
         updateTitle()
         renderChart()
+        view.addGestureRecognizer(outsideTapGR)
+
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(contextDidChange(_:)),
@@ -449,6 +457,25 @@ final class StatsVC: BaseVC {
         case .month: return cal.date(byAdding: .month, value: delta, to: anchorDate).map(monthStart(_:))!
         case .year:  return cal.date(byAdding: .year,  value: delta, to: anchorDate).map(yearStart(_:))!
         }
+    }
+}
+
+
+//MARK: -  Gesture
+extension StatsVC: UIGestureRecognizerDelegate{
+    @objc private func handleOutsideTap(_ g: UITapGestureRecognizer) {
+        guard g.state == .ended else { return }
+        guard presentedViewController == nil, !isBeingDismissed else { return }
+
+        let p = g.location(in: view)
+        if !topView.frame.contains(p) {
+            dismiss(animated: true)
+        }
+    }
+
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
+                           shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+        return true
     }
 }
 

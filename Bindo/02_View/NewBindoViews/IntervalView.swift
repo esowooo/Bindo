@@ -54,7 +54,7 @@ final class IntervalView: UIView {
     private let includeRow   = UIStackView()
     private let includeBtn   = UIButton(type: .system)
     private let includeLabel = AppLabel("Include as Payday", style: .secondaryBody, tone: .main2)
-    
+    private let intervalPrefix = AppLabel("Once in", style: .body, tone: .label)
     
     // 구분선
     private let sep1 = AppSeparator()
@@ -144,10 +144,13 @@ final class IntervalView: UIView {
         
         // Interval 행(값/단위)
         let intervalRow = UIStackView()
-        intervalRow.addArrangedSubview(intervalUnitPD)
+        intervalRow.addArrangedSubview(intervalPrefix)
         intervalRow.addArrangedSubview(intervalValuePD)
-        let intervalWrap = UIView()
-        intervalWrap.addSubview(intervalRow)
+        intervalRow.addArrangedSubview(intervalUnitPD)
+
+        let intervalTailSpacer = UIView()
+        intervalRow.addArrangedSubview(intervalTailSpacer)
+
         
         // End 스위치 행 (오른쪽 끝 토글)
         let endSpacer = UIView()
@@ -211,14 +214,23 @@ final class IntervalView: UIView {
         root.spacing = 12
         root.translatesAutoresizingMaskIntoConstraints = false
         
-        
         // Interval Row
+        intervalTailSpacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        intervalTailSpacer.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         intervalRow.axis = .horizontal
         intervalRow.alignment = .center
         intervalRow.distribution = .fill
         intervalRow.spacing = 12
-        intervalRow.translatesAutoresizingMaskIntoConstraints = false
-        intervalWrap.translatesAutoresizingMaskIntoConstraints = false
+        intervalRow.isLayoutMarginsRelativeArrangement = true
+        intervalRow.directionalLayoutMargins = .init(top: 0, leading: 8, bottom: 0, trailing: 0)
+        [intervalValuePD, intervalUnitPD].forEach {
+            $0.setContentHuggingPriority(.required, for: .horizontal)
+            $0.setContentCompressionResistancePriority(.required, for: .horizontal)
+        }
+
+        intervalPrefix.textAlignment = .left
+        intervalPrefix.setContentHuggingPriority(.required, for: .horizontal)
+        intervalPrefix.setContentCompressionResistancePriority(.required, for: .horizontal)
         
         // End Switch Row
         endSwitchRow.axis = .horizontal
@@ -294,13 +306,6 @@ final class IntervalView: UIView {
             root.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor, constant: -32)
         ])
         
-        // IntervalRow 내부 제약
-        NSLayoutConstraint.activate([
-            intervalRow.leadingAnchor.constraint(equalTo: intervalWrap.leadingAnchor),
-            intervalRow.trailingAnchor.constraint(equalTo: intervalWrap.trailingAnchor),
-            intervalRow.topAnchor.constraint(equalTo: intervalWrap.topAnchor),
-            intervalRow.bottomAnchor.constraint(equalTo: intervalWrap.bottomAnchor)
-        ])
         
         // ─────────────────────────────────────
         // 4) 우선순위/배치(스택에 실제 추가)
@@ -313,11 +318,6 @@ final class IntervalView: UIView {
         summaryValue.setContentHuggingPriority(.defaultLow, for: .horizontal)
         summaryValue.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         
-        // Interval PD 폭/우선순위
-        [intervalValuePD, intervalUnitPD].forEach {
-            $0.setContentHuggingPriority(.required, for: .horizontal)
-            $0.setContentCompressionResistancePriority(.required, for: .horizontal)
-        }
         
         // End 스위치 행: spacer는 유연하게
         endSpacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
@@ -333,7 +333,7 @@ final class IntervalView: UIView {
         root.addArrangedSubview(sep2)
         
         root.addArrangedSubview(intervalLabel)
-        root.addArrangedSubview(intervalWrap)
+        root.addArrangedSubview(intervalRow)
         root.addArrangedSubview(sep3)
         
         root.addArrangedSubview(startHeaderRow)
@@ -357,36 +357,6 @@ final class IntervalView: UIView {
         [intervalValuePD, intervalUnitPD].forEach { $0.displayMode = .customPopup }
     }
     
-    private func lockPulldownWidthsUsingMaxContent() {
-        let values = (1...36).map { "\($0)" }
-        let units  = IntervalUnit.allCases.map { $0.title }
-        let font   = AppTheme.Font.body
-        
-        func width(of text: String) -> CGFloat {
-            (text as NSString).size(withAttributes: [.font: font]).width
-        }
-        let maxValueW = values.map(width(of:)).max() ?? 0
-        let maxUnitW  = units.map(width(of:)).max() ?? 0
-        
-        let insets  = AppTheme.PullDown.contentInsets
-        let padding = insets.leading + insets.trailing + 50 // 아이콘/여백 포함 여유치
-        let target  = max(AppTheme.PullDown.popupMinWidth, max(maxValueW, maxUnitW) + padding)
-        
-        // 기존 제약 해제
-        unitWidthC?.isActive = false
-        valueWidthC?.isActive = false
-        
-        // “선호 너비”로 설정(필요시 깨질 수 있게)
-        let unitEq   = intervalUnitPD.widthAnchor.constraint(equalToConstant: target)
-        unitEq.priority = .defaultHigh     // 750 (필요시 시스템이 살짝 줄일 수 있음)
-        
-        let valueEq  = intervalValuePD.widthAnchor.constraint(equalToConstant: target)
-        valueEq.priority = .defaultHigh
-        
-        NSLayoutConstraint.activate([unitEq, valueEq])
-        unitWidthC = unitEq
-        valueWidthC = valueEq
-    }
     
     // MARK: - Interval PullDown 구성
     private func configureIntervalPickers() {
@@ -402,9 +372,6 @@ final class IntervalView: UIView {
             intervalUnitPD.setItems(units, select: 0)
         }
         updateNextPayLabel()
-        DispatchQueue.main.async { [weak self] in
-            self?.lockPulldownWidthsUsingMaxContent()
-        }
     }
     
     // MARK: - 이벤트 바인딩

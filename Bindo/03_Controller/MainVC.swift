@@ -18,22 +18,45 @@ final class MainVC: BaseVC {
     private let menu = FloatingActionMenu()
     private lazy var filterButton: UIButton = {
         var cfg = UIButton.Configuration.plain()
-        cfg.cornerStyle = .capsule
+        cfg.cornerStyle = .medium
+        cfg.image = UIImage(systemName: "line.3.horizontal.decrease")?
+            .applyingSymbolConfiguration(actionSymbolConfig)
+        cfg.imagePadding = 0
         cfg.baseForegroundColor = .systemGray2
-        cfg.contentInsets = .init(top: 2, leading: 12, bottom: 2, trailing: 12)
-
-        let attr = AttributedString("All", attributes: AttributeContainer([
-            .font: AppTheme.Font.secondaryBody,
-            .foregroundColor: UIColor.systemGray2
-        ]))
-        cfg.attributedTitle = attr
+        cfg.contentInsets = actionContentInsets
 
         let b = UIButton(configuration: cfg)
         b.translatesAutoresizingMaskIntoConstraints = false
-        b.layer.cornerRadius = 10
-        b.layer.cornerCurve = .continuous
-        b.layer.borderWidth = 1
-        b.layer.borderColor = UIColor.systemGray2.cgColor
+        b.setPreferredSymbolConfiguration(actionSymbolConfig, forImageIn: .normal)
+
+        // Outline (보더) 세팅
+        b.backgroundColor = .clear
+        b.layer.cornerRadius = 8
+        b.layer.cornerCurve  = .continuous
+        b.layer.borderWidth  = 1
+        b.layer.borderColor  = UIColor.systemGray2.cgColor
+        b.clipsToBounds      = true
+
+        // 사이즈 제약(기존 액션 버튼과 동일)
+        b.heightAnchor.constraint(greaterThanOrEqualToConstant: 22).isActive = true
+        b.widthAnchor.constraint(greaterThanOrEqualToConstant: actionMinWidth).isActive = true
+        b.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        b.setContentCompressionResistancePriority(.required, for: .horizontal)
+
+        // 상태 업데이트(비활성화 시 연한 회색으로)
+        b.configurationUpdateHandler = { btn in
+            var c = btn.configuration ?? .plain()
+            c.cornerStyle = .medium
+            c.baseForegroundColor = btn.isEnabled ? .systemGray2 : .systemGray3
+            btn.configuration = c
+
+            btn.layer.borderColor = (btn.isEnabled ? UIColor.systemGray2 : UIColor.systemGray3).cgColor
+            btn.layer.borderWidth = 1
+            btn.layer.cornerRadius = 8
+            btn.layer.cornerCurve  = .continuous
+        }
+
+        b.accessibilityLabel = "Filter"
         b.addTarget(self, action: #selector(filterButtonTapped), for: .touchUpInside)
         return b
     }()
@@ -131,6 +154,9 @@ final class MainVC: BaseVC {
         minHeight: 22, minWidth: actionMinWidth,
         accessibility: "Cancel", action: #selector(cancelTapped)
     )
+    
+    
+    
     // 오버레이. 특정 예외 뷰 영역은 통과(pointInside == false).
     private final class PassthroughOverlay: UIView {
         weak var targetVC: MainVC?
@@ -139,6 +165,10 @@ final class MainVC: BaseVC {
 
         override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
             // 1) 액션 버튼은 통과 (편집 모드 유지)
+            if targetVC?.isActiveScreen != true {
+                return true
+            }
+            
             for v in passButtons {
                 guard v.window != nil, !v.isHidden, v.alpha > 0.01 else { continue }
                 let p = convert(point, to: v)
@@ -149,12 +179,10 @@ final class MainVC: BaseVC {
             if let tv = tableView, tv.window != nil {
                 let pInTable = convert(point, to: tv)
                 if let ip = tv.indexPathForRow(at: pInTable) {
-                    // 화면 밖 셀이어도 row 영역이면 통과시켜 체크 토글 유지
-                    if let cell = tv.cellForRow(at: ip) {
-                        let pInCell = convert(point, to: cell)
-                        if cell.point(inside: pInCell, with: event) { return false }
-                    } else {
-                        return false
+                    var rowRect = tv.rectForRow(at: ip)
+                    rowRect = rowRect.insetBy(dx: 0, dy: -2) // 경계 여유
+                    if rowRect.contains(pInTable) {
+                        return false // 오버레이가 받지 않음 → 테이블이 처리
                     }
                 }
             }
@@ -201,8 +229,8 @@ final class MainVC: BaseVC {
             case .all:      return "All"
             case .active:   return "Active"
             case .expired:  return "Expired"
-            case .interval: return "Interval"
-            case .date:     return "Date"
+            case .interval: return "Interval Mode"
+            case .date:     return "Date Mode"
             }
         }
     }
@@ -238,6 +266,7 @@ final class MainVC: BaseVC {
         } catch {
             print("refresh/fetch error:", error)
         }
+        resumeMainInteractions()
     }
 
     override func viewWillAppear(_ animated: Bool) {
@@ -255,6 +284,15 @@ final class MainVC: BaseVC {
         headView.layer.cornerRadius = AppTheme.Corner.xl
         headView.layer.cornerCurve = .continuous
         headView.clipsToBounds = true
+    }
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        suspendMainInteractions()
+    }
+    
+    override func viewDidDisappear(_ animated: Bool) {
+        super.viewDidDisappear(animated)
+        removeEditOverlayIfNeeded()
     }
     
     deinit {
@@ -353,21 +391,8 @@ final class MainVC: BaseVC {
     /// 필터를 세팅하고 저장/적용/버튼 상태까지 업데이트
     private func setFilter(_ f: Filter, persist: Bool, animated: Bool) {
         currentFilter = f
-        if persist {
-            UserDefaults.standard.set(f.rawValue, forKey: filterDefaultsKey)
-        }
+        if persist { UserDefaults.standard.set(f.rawValue, forKey: filterDefaultsKey) }
 
-        // 버튼 타이틀/상태
-        var cfg = filterButton.configuration ?? .plain()
-        let attr = AttributedString(f.title, attributes: AttributeContainer([
-            .font: AppTheme.Font.secondaryBody,
-            .foregroundColor: UIColor.systemGray2
-        ]))
-        cfg.attributedTitle = attr
-        filterButton.configuration = cfg
-
-
-        // 데이터 반영
         applyFilterAndFetch()
     }
     
@@ -428,12 +453,14 @@ final class MainVC: BaseVC {
     // MARK: - Actions
     /// + 버튼 → ReviewBindoVC(컨테이너) 푸시
     @objc private func plusTapped() {
+        suspendMainInteractions()
         guard let vc = storyboard?.instantiateViewController(withIdentifier: "NewBindoVC") as? NewBindoVC else { return }
         navigationController?.pushViewController(vc, animated: true)
         hideMenu()
     }
 
     @objc private func calendarButtonTapped() {
+        suspendMainInteractions()
         guard let calendarVC = storyboard?.instantiateViewController(withIdentifier: "CalendarVC") as? CalendarVC else { return }
         calendarVC.modalPresentationStyle = .overCurrentContext
         calendarVC.modalTransitionStyle = .crossDissolve
@@ -441,6 +468,7 @@ final class MainVC: BaseVC {
     }
 
     @objc private func statsButtonTapped() {
+        suspendMainInteractions()
         guard let statsVC = storyboard?.instantiateViewController(withIdentifier: "StatsVC") as? StatsVC else { return }
         statsVC.modalPresentationStyle = .overCurrentContext
         statsVC.modalTransitionStyle = .crossDissolve
@@ -448,6 +476,7 @@ final class MainVC: BaseVC {
     }
 
     @objc private func setupButtonTapped() {
+        suspendMainInteractions()
         guard let settingVC = storyboard?.instantiateViewController(withIdentifier: "SettingsVC") as? SettingsVC else { return }
         settingVC.modalPresentationStyle = .overCurrentContext
         settingVC.modalTransitionStyle = .crossDissolve
@@ -456,6 +485,7 @@ final class MainVC: BaseVC {
     
     @objc private func editTapped() {
         guard let id = selectedIDs.first else { return }
+        suspendMainInteractions()
         guard let vc = storyboard?.instantiateViewController(withIdentifier: "NewBindoVC") as? NewBindoVC else { return }
         vc.editingID = id
         vc.repo = repo
@@ -673,6 +703,28 @@ final class MainVC: BaseVC {
     private func updateActionButtons() {
         editButton.isEnabled = (selectedIDs.count == 1)
         deleteButton.isEnabled = !selectedIDs.isEmpty
+    }
+    
+    private var isActiveScreen: Bool {
+        guard isOnWindow else { return false }
+        if let nav = navigationController {
+            return nav.topViewController === self && presentedViewController == nil
+        }
+        return presentedViewController == nil
+    }
+
+    private func suspendMainInteractions() {
+        // 편집 모드 강종료 + 제스처/테이블 비활성화 + 오버레이 입력 차단
+        setEditingMode(false)
+        tableView.isUserInteractionEnabled = false
+        longPressGR?.isEnabled = false
+        editOverlay?.isUserInteractionEnabled = false
+    }
+
+    private func resumeMainInteractions() {
+        tableView.isUserInteractionEnabled = true
+        longPressGR?.isEnabled = true
+        editOverlay?.isUserInteractionEnabled = true
     }
     
     
@@ -1010,7 +1062,7 @@ extension MainVC: UITableViewDataSource {
                        isChecked: isChecked)
         
         let period = currentPeriod(for: entity)
-        let terminal = terminalEnd(for: entity) 
+        let terminal = terminalEnd(for: entity)
         let last = lastOccurrence(for: entity)?.endDate
         cell.setProgress(start: period.start, next: period.end, endAt: terminal, last: last)
         
@@ -1147,7 +1199,7 @@ extension MainVC: UITableViewDelegate {
     }
 }
 
-// MARK: - FRC Delegate (정석 버전)
+// MARK: - FRC Delegate
 extension MainVC: NSFetchedResultsControllerDelegate {
     func controllerWillChangeContent(_ controller: NSFetchedResultsController<NSFetchRequestResult>) {
         guard isOnWindow else { needsReloadOnAppear = true; return }
@@ -1155,43 +1207,44 @@ extension MainVC: NSFetchedResultsControllerDelegate {
     }
 
     func controller(_ controller: NSFetchedResultsController<NSFetchRequestResult>,
-                        didChange anObject: Any,
-                        at indexPath: IndexPath?,
-                        for type: NSFetchedResultsChangeType,
-                        newIndexPath: IndexPath?) {
-            guard isOnWindow else { needsReloadOnAppear = true; return }
-            switch type {
-            case .insert:
-                if let new = newIndexPath { tableView.insertRows(at: [new], with: .automatic) }
-            case .delete:
-                if let idx = indexPath   { tableView.deleteRows(at: [idx], with: .automatic) }
-            case .update:
-                if let idx = indexPath   { tableView.reloadRows(at: [idx], with: .automatic) }
-            case .move:
-                if let from = indexPath, let to = newIndexPath {
-                    if from == to { tableView.reloadRows(at: [from], with: .automatic) }
-                    else          { tableView.moveRow(at: from, to: to) }
-                }
-            @unknown default: break
+                    didChange anObject: Any,
+                    at indexPath: IndexPath?,
+                    for type: NSFetchedResultsChangeType,
+                    newIndexPath: IndexPath?) {
+        guard isOnWindow else { needsReloadOnAppear = true; return }
+        switch type {
+        case .insert:
+            if let new = newIndexPath { tableView.insertRows(at: [new], with: .automatic) }
+        case .delete:
+            if let idx = indexPath   { tableView.deleteRows(at: [idx], with: .automatic) }
+        case .update:
+            if let idx = indexPath   { tableView.reloadRows(at: [idx], with: .automatic) }
+        case .move:
+            if let from = indexPath, let to = newIndexPath {
+                if from == to { tableView.reloadRows(at: [from], with: .automatic) }
+                else          { tableView.moveRow(at: from, to: to) }
             }
+        @unknown default: break
         }
+    }
 
-        func controller(_ controller: NSFetchedResultsController<NSFetchRequestResult>,
-                        didChange sectionInfo: NSFetchedResultsSectionInfo,
-                        atSectionIndex sectionIndex: Int,
-                        for type: NSFetchedResultsChangeType) {
-            guard isOnWindow else { needsReloadOnAppear = true; return }
-            switch type {
-            case .insert: tableView.insertSections(IndexSet(integer: sectionIndex), with: .automatic)
-            case .delete: tableView.deleteSections(IndexSet(integer: sectionIndex), with: .automatic)
-            default: break
-            }
+    // ⬇️ 이 두 개를 “함수 밖” 최상위로 빼주세요 (지금은 내부에 중첩되어 있음)
+    func controller(_ controller: NSFetchedResultsController<NSFetchRequestResult>,
+                    didChange sectionInfo: NSFetchedResultsSectionInfo,
+                    atSectionIndex sectionIndex: Int,
+                    for type: NSFetchedResultsChangeType) {
+        guard isOnWindow else { needsReloadOnAppear = true; return }
+        switch type {
+        case .insert: tableView.insertSections(IndexSet(integer: sectionIndex), with: .automatic)
+        case .delete: tableView.deleteSections(IndexSet(integer: sectionIndex), with: .automatic)
+        default: break
         }
+    }
 
-        func controllerDidChangeContent(_ controller: NSFetchedResultsController<NSFetchRequestResult>) {
-            guard isOnWindow else { return }
-            tableView.endUpdates()
-        }
+    func controllerDidChangeContent(_ controller: NSFetchedResultsController<NSFetchRequestResult>) {
+        guard isOnWindow else { return }
+        tableView.endUpdates()
+    }
 }
 
 

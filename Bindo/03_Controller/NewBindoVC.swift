@@ -105,14 +105,23 @@ final class NewBindoVC: BaseVC {
         )
         let left = AppNavigation.makeButton(backItem, style: .plainAccent)
 
-        let saveItem = AppNavigation.BarItem(
-            systemImage: "tray.and.arrow.down",
-            accessibilityLabel: "Save",
-            action: UIAction { [weak self] _ in self?.saveTapped() }
+        var cfg = UIButton.Configuration.plain()
+        cfg.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 15)
+        cfg.attributedTitle = AttributedString(
+            "Save",
+            attributes: AttributeContainer([
+                .font: AppTheme.Font.body,
+                .foregroundColor: AppTheme.Color.accent
+            ])
         )
-        let right = AppNavigation.makeButton(saveItem, style: .plainAccent)
 
-        AppNavigation.setItems(left: [left], right: [right], for: self)
+        let saveButton = UIButton(configuration: cfg)
+        saveButton.addAction(UIAction { [weak self] _ in
+            self?.saveTapped()
+        }, for: .touchUpInside)
+
+        let saveItem = UIBarButtonItem(customView: saveButton)
+        AppNavigation.setItems(left: [left], right: [saveItem], for: self)
 
         // AppPullDownField 구성
         titleField.translatesAutoresizingMaskIntoConstraints = false
