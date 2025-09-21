@@ -57,7 +57,10 @@ final class StatsVC: BaseVC {
         }
 
         buildUI()
-        buildControls(["Month", "Year"])
+        buildControls([
+            NSLocalizedString("stats.mode.month", comment: "StatsVC.swift: Month"),
+            NSLocalizedString("stats.mode.year",  comment: "StatsVC.swift: Year")
+        ])
         applyTheme()
         anchorDate = periodStart(for: Date(), granularity: granularity)
         updateTitle()
@@ -87,7 +90,6 @@ final class StatsVC: BaseVC {
         }
     }
     
-    
     deinit {
         NotificationCenter.default.removeObserver(self,
             name: .NSManagedObjectContextObjectsDidChange,
@@ -95,7 +97,6 @@ final class StatsVC: BaseVC {
     }
     
     @objc private func contextDidChange(_ note: Notification) {
-        // 필요하면 provider 재생성(캐싱이 있다면)
         if provider == nil {
             provider = RepositoryStatsProvider(repo: CoreDataBindoRepository(context: viewContext))
         }
@@ -116,10 +117,8 @@ final class StatsVC: BaseVC {
         axisOverlay.backgroundColor = .clear
         axisOverlay.tintColor       = AppTheme.Color.accent
         axisOverlay.isUserInteractionEnabled = false
-
         chartView.addSubview(axisOverlay)
 
-        // axisOverlay를 chartView에 풀스트레치
         NSLayoutConstraint.activate([
             axisOverlay.leadingAnchor.constraint(equalTo: chartView.leadingAnchor),
             axisOverlay.trailingAnchor.constraint(equalTo: chartView.trailingAnchor),
@@ -174,11 +173,11 @@ final class StatsVC: BaseVC {
         rs.translatesAutoresizingMaskIntoConstraints = false
 
         let items: [(symbol: String, selector: Selector, a11y: String)] = [
-            ("chevron.left", #selector(prevAnchorTapped),  "Previous period"),
-            ("minus",        #selector(zoomoutRangeTapped), "Narrow range"),
-            ("circle",  #selector(centerRangeTapped),  "Current Period"),
-            ("plus",         #selector(zoominRangeTapped),  "Widen range"),
-            ("chevron.right",#selector(nextAnchorTapped),   "Next period")
+            ("chevron.left", #selector(prevAnchorTapped),  NSLocalizedString("stats.a11y.prev",  comment: "StatsVC.swift: Previous period")),
+            ("minus",        #selector(zoomoutRangeTapped), NSLocalizedString("stats.a11y.narrow",comment: "StatsVC.swift: Narrow range")),
+            ("circle",       #selector(centerRangeTapped),  NSLocalizedString("stats.a11y.current",comment: "StatsVC.swift: Current period")),
+            ("plus",         #selector(zoominRangeTapped),  NSLocalizedString("stats.a11y.widen", comment: "StatsVC.swift: Widen range")),
+            ("chevron.right",#selector(nextAnchorTapped),   NSLocalizedString("stats.a11y.next",  comment: "StatsVC.swift: Next period"))
         ]
 
         for spec in items {
@@ -189,8 +188,6 @@ final class StatsVC: BaseVC {
             cfg.image = UIImage(systemName: spec.symbol)
             cfg.preferredSymbolConfigurationForImage = UIImage.SymbolConfiguration(pointSize: 12, weight: .semibold)
             cfg.contentInsets = .init(top: 8, leading: 10, bottom: 8, trailing: 10)
-            cfg.title = nil
-            cfg.attributedTitle = nil
 
             let b = UIButton(configuration: cfg)
             b.addTarget(self, action: spec.selector, for: .touchUpInside)
@@ -209,8 +206,8 @@ final class StatsVC: BaseVC {
 
         // chartControlView 내부에 핀(상하좌우) — 레이아웃 안정
         NSLayoutConstraint.activate([
-            rs.topAnchor.constraint(equalTo: host.topAnchor, constant: 0),
-            rs.bottomAnchor.constraint(equalTo: host.bottomAnchor, constant: 0),
+            rs.topAnchor.constraint(equalTo: host.topAnchor),
+            rs.bottomAnchor.constraint(equalTo: host.bottomAnchor),
             rs.leadingAnchor.constraint(greaterThanOrEqualTo: host.leadingAnchor, constant: 8),
             rs.trailingAnchor.constraint(lessThanOrEqualTo: host.trailingAnchor, constant: -8),
             rs.centerXAnchor.constraint(equalTo: host.centerXAnchor)
@@ -258,14 +255,15 @@ final class StatsVC: BaseVC {
         l.translatesAutoresizingMaskIntoConstraints = false
         l.numberOfLines = 0
         l.textAlignment = .center
-        l.text = "No data available"
+        l.text = NSLocalizedString("stats.noData", comment: "StatsVC.swift: No data available")
         l.textColor = AppTheme.Color.main2.withAlphaComponent(0.9)
         l.font = AppTheme.Font.secondaryBody
         l.isHidden = true
         return l
     }()
 
-    private func setNoDataVisible(_ show: Bool, message: String = "No data available") {
+    private func setNoDataVisible(_ show: Bool,
+                                  message: String = NSLocalizedString("stats.noData", comment: "StatsVC.swift: No data available")) {
         noDataLabel.text = message
         noDataLabel.isHidden = !show
     }
@@ -321,7 +319,7 @@ final class StatsVC: BaseVC {
     }
 
     private func updateTitle() {
-        
+        // 숫자 포맷 유지(yyyy.MM / yyyy)
         titleLabel.text = provider?.title(for: anchorDate, granularity: granularity)
     }
     
@@ -345,7 +343,7 @@ final class StatsVC: BaseVC {
             return
         }
 
-        // 1) 가로 윈도우 구성 (⚠️ 앵커 기준!)
+        // 1) 가로 윈도우 구성
         let range = expandedInterval(for: anchorDate, granularity: granularity)
 
         // 2) 저장소에서 기본 버킷 가져오기 (저장+프로젝션 합산)
@@ -385,13 +383,11 @@ final class StatsVC: BaseVC {
         let maxY    = max(dataMax, hinted, 1)
         let displayMaxY = max(1, maxY * 1.02)
 
-
         // 화면에 꽉 차는 막대 폭/간격 산정
         let bottomInset = xLabelsBottomInset()
         chartView.plotInset = .init(top: 14, left: 0, bottom: bottomInset, right: 0)
         axisOverlay.plotInset = chartView.plotInset
         
-
         let plotWidth = max(0, chartView.bounds.width - (chartView.plotInset.left + chartView.plotInset.right))
         let barCount  = max(values.count, 1)
         let stepPx    = (barCount > 0) ? (plotWidth / CGFloat(barCount)) : plotWidth
@@ -413,6 +409,7 @@ final class StatsVC: BaseVC {
         chartView.highlightIndex = anchorIndex
         axisOverlay.setReferenceX(nil)
     }
+
     private func xLabelsBottomInset() -> CGFloat {
         // xLabelFont은 BarChartView가 가진 폰트 사용
         let h = chartView.xLabelFont.lineHeight
@@ -482,7 +479,12 @@ extension StatsVC: UIGestureRecognizerDelegate{
 // MARK: - Bindo Repository Provider
 enum StatsGranularity: CaseIterable {
     case month, year
-    var title: String { self == .month ? "Month" : "Year" }
+    var title: String {
+        switch self {
+        case .month: return NSLocalizedString("stats.mode.month", comment: "StatsVC.swift: Month")
+        case .year:  return NSLocalizedString("stats.mode.year",  comment: "StatsVC.swift: Year")
+        }
+    }
 }
 
 struct StatsBucket: Hashable {
@@ -516,6 +518,7 @@ final class RepositoryStatsProvider: StatsProvider {
     }
 
     func title(for start: Date, granularity: StatsGranularity) -> String {
+        // 숫자 포맷 고정 (현지화 대상 아님)
         let df = DateFormatter()
         df.locale = .current
         df.dateFormat = (granularity == .month) ? "yyyy.MM" : "yyyy"

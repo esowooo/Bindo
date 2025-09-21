@@ -8,55 +8,94 @@
 
 import UIKit
 
-// MARK: - Font Type (커스텀 폰트)
-private enum FontType: String {
-    case quickSandBold     = "Quicksand-Bold"
-    case quicksandSemiBold = "Quicksand-SemiBold"
-    case quickSandMedium   = "Quicksand-Medium"
-    case quickSandRegular  = "Quicksand-Regular"
-    case quickSandLight    = "Quicksand-Light"
-    
-    var name: String { rawValue }
+
+// AppTheme.swift
+
+import UIKit
+
+// MARK: - Language routing for fonts
+private enum AppLanguage {
+    case latin, korean, japanese
+    static var current: AppLanguage {
+        let id = Bundle.main.preferredLocalizations.first?.lowercased()
+              ?? Locale.preferredLanguages.first?.lowercased()
+              ?? Locale.current.identifier.lowercased()
+        if id.hasPrefix("ko") { return .korean }
+        if id.hasPrefix("ja") { return .japanese }
+        return .latin
+    }
 }
 
-//MARK: - App Theme
+private struct FontFamily {
+    let regular: String
+    let medium:  String
+    let semibold:String
+    let bold:    String
+}
+
+private func family(for lang: AppLanguage) -> FontFamily {
+    switch lang {
+    case .latin:
+        return .init(
+            regular: "Quicksand-Regular",
+            medium:  "Quicksand-Medium",
+            semibold:"Quicksand-SemiBold",
+            bold:    "Quicksand-Bold"
+        )
+    case .korean:
+        return .init(
+            regular: "AppleSDGothicNeo-Regular",
+            medium:  "AppleSDGothicNeo-Medium",
+            semibold:"AppleSDGothicNeo-SemiBold",
+            bold:    "AppleSDGothicNeo-Bold"
+        )
+    case .japanese:
+        return .init(
+            regular: "HiraginoSans-W3",
+            medium:  "HiraginoSans-W4",
+            semibold:"HiraginoSans-W6",
+            bold:    "HiraginoSans-W7"
+        )
+    }
+}
+
+private func themedFont(name: String, size: CGFloat, weight: UIFont.Weight, textStyle: UIFont.TextStyle) -> UIFont {
+    let base = UIFont(name: name, size: size) ?? .systemFont(ofSize: size, weight: weight)
+    return UIFontMetrics(forTextStyle: textStyle).scaledFont(for: base) // Dynamic Type
+}
+
 public enum AppTheme {
-    
-    // MARK: - Colors (5가지 고정, 필요 시 확장)
+
     public enum Color {
         public static var background: UIColor { .color1 }
-        public static var main1: UIColor { .color4 }    // 기본 텍스트
-        public static var main2: UIColor { .color3 }    // 보조 텍스트 / 옅은색
-        public static var main3: UIColor { .color2 }    // 보조 텍스트2 / 더 옅은색
+        public static var main1: UIColor { .color4 }
+        public static var main2: UIColor { .color3 }
+        public static var main3: UIColor { .color2 } // 보조 텍스트2 / 더 옅은색
         public static var accent: UIColor { .color5 }
         public static var label: UIColor { .color6 }
     }
-    
-    // MARK: - Fonts (5종류, 필요 시 확장)
+
+    // MARK: - Fonts (언어별 자동 스위칭)
     public enum Font {
+        private static var fam: FontFamily { family(for: AppLanguage.current) }
+
         public static var title: UIFont {
-            UIFont(name: FontType.quicksandSemiBold.rawValue, size: 24)
-            ?? .systemFont(ofSize: 24, weight: .semibold)
+            themedFont(name: fam.semibold, size: 24, weight: .semibold, textStyle: .title2)
         }
         public static var secondaryTitle: UIFont {
-            UIFont(name: FontType.quicksandSemiBold.rawValue, size: 20)
-            ?? .systemFont(ofSize: 20, weight: .semibold)
+            themedFont(name: fam.semibold, size: 20, weight: .semibold, textStyle: .headline)
         }
         public static var body: UIFont {
-            UIFont(name: FontType.quickSandRegular.rawValue, size: 16)
-            ?? .systemFont(ofSize: 16, weight: .regular)
+            themedFont(name: fam.regular, size: 16, weight: .regular, textStyle: .body)
         }
         public static var secondaryBody: UIFont {
-            UIFont(name: FontType.quickSandRegular.rawValue, size: 12)
-            ?? .systemFont(ofSize: 14, weight: .regular)
+            themedFont(name: fam.regular, size: 12, weight: .regular, textStyle: .footnote)
         }
         public static var caption: UIFont {
-            UIFont(name: FontType.quickSandRegular.rawValue, size: 10)
-            ?? .systemFont(ofSize: 12, weight: .regular)
+            themedFont(name: fam.regular, size: 10, weight: .regular, textStyle: .caption2)
         }
     }
-    
-    // MARK: - Spacing
+
     public enum Spacing {
         public static let xs: CGFloat = 4
         public static let s:  CGFloat = 8
@@ -65,19 +104,14 @@ public enum AppTheme {
         public static let xl: CGFloat = 24
         public static let xxl: CGFloat = 32
     }
-    
-    
-    // MARK: - Corner Radius
+
     public enum Corner {
         public static let s: CGFloat = 6
         public static let m: CGFloat = 8
         public static let l: CGFloat = 12
         public static let xl: CGFloat = 14
     }
-    
-    
-    
-    // MARK: - Shadow (카드/팝오버 등에 사용)
+
     public enum Shadow {
         public static func applyCard(to layer: CALayer) {
             layer.shadowColor = UIColor.black.cgColor
@@ -87,17 +121,14 @@ public enum AppTheme {
             layer.masksToBounds = false
         }
     }
-    
-    
-    // MARK: - Control Sizes (자주 쓰는 컴포넌트 크기)
+
     public enum Control {
         public static let fieldHeight: CGFloat = 40
         public static let buttonHeight: CGFloat = 44
         public static let pickerMinHeight: CGFloat = 180
         public static let separatorThickness: CGFloat = 1.0 / UIScreen.main.scale
     }
-    
-    //MARK: - Pull Down
+
     enum PullDown {
         static let popupMinWidth: CGFloat = 50
         static let popupExtraPadding: CGFloat = 15
@@ -112,9 +143,7 @@ public enum AppTheme {
         static let popupCellMargins: NSDirectionalEdgeInsets = .init(top: 0, leading: 10, bottom: 0, trailing: 10)
         static let popupContentsSpacing: CGFloat = 15
     }
-    
 }
-
 // MARK: - Helpers (확장 안전 접근)
 private extension UIColor {
     static func performIfAvailable(_ name: String) -> UIColor? {

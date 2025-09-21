@@ -19,7 +19,9 @@ final class SettingsVC: BaseVC {
     
     // Rows – 컨트롤만 미리 잡아두면 나중에 바인딩 쉬움
     private let statusBarSwitch   = UISwitch()
-    private let ccyField          = AppPullDownField(placeholder: "None")
+    private let ccyField = AppPullDownField(
+        placeholder: NSLocalizedString("settings.ccy.none", comment: "SettingsVC.swift: None placeholder")
+    )
     
     private let commaSwitch       = UISwitch()
     private let payDaySwitch      = UISwitch()
@@ -275,30 +277,62 @@ final class SettingsVC: BaseVC {
         
         // ─────────────────────────────────────────────────
         
-        // ── SECTION: App
-        //        stackView.addArrangedSubview(sectionSeparatorView())
-        stackView.addArrangedSubview(sectionHeader("App"))
+        // SECTION: App
+        stackView.addArrangedSubview(sectionHeader(
+            NSLocalizedString("settings.section.app", comment: "SettingsVC.swift: App")
+        ))
         stackView.addArrangedSubview(sectionSeparatorView())
-        stackView.addArrangedSubview(toggleRow(title: "Show Status Bar", toggle: statusBarSwitch))
-        
-        // ── SECTION: Main
-        stackView.addArrangedSubview(sectionHeader("Main"))
+        stackView.addArrangedSubview(toggleRow(
+            title: NSLocalizedString("settings.toggle.statusBar", comment: "SettingsVC.swift: Show Status Bar"),
+            toggle: statusBarSwitch
+        ))
+
+        // SECTION: Main
+        stackView.addArrangedSubview(sectionHeader(
+            NSLocalizedString("settings.section.main", comment: "SettingsVC.swift: Main")
+        ))
         stackView.addArrangedSubview(sectionSeparatorView())
-        stackView.addArrangedSubview(pullDownRow(title: "CCY Display", field: ccyField, placeholder: "None"))
+        stackView.addArrangedSubview(pullDownRow(
+            title: NSLocalizedString("settings.ccy.title", comment: "SettingsVC.swift: CCY Display"),
+            field: ccyField,
+            placeholder: NSLocalizedString("settings.ccy.none", comment: "SettingsVC.swift: None placeholder")
+        ))
         stackView.addArrangedSubview(rowSeparatorView())
-        stackView.addArrangedSubview(toggleRow(title: "Use Comma Separator", toggle: commaSwitch))
+        stackView.addArrangedSubview(toggleRow(
+            title: NSLocalizedString("settings.toggle.comma", comment: "SettingsVC.swift: Use Comma Separator"),
+            toggle: commaSwitch
+        ))
         stackView.addArrangedSubview(rowSeparatorView())
-        stackView.addArrangedSubview(toggleRow(title: "Show Payday", toggle: payDaySwitch))
+        stackView.addArrangedSubview(toggleRow(
+            title: NSLocalizedString("settings.toggle.payday", comment: "SettingsVC.swift: Show Payday"),
+            toggle: payDaySwitch
+        ))
         stackView.addArrangedSubview(rowSeparatorView())
-        stackView.addArrangedSubview(toggleRow(title: "Show Days Left", toggle: daysLeftSwitch))
+        stackView.addArrangedSubview(toggleRow(
+            title: NSLocalizedString("settings.toggle.daysleft", comment: "SettingsVC.swift: Show Days Left"),
+            toggle: daysLeftSwitch
+        ))
         stackView.addArrangedSubview(rowSeparatorView())
-        stackView.addArrangedSubview(toggleRow(title: "Show Amount", toggle: amountSwitch))
-        
-        // ── SECTION: Tools
-        stackView.addArrangedSubview(sectionHeader("Tools"))
+        stackView.addArrangedSubview(toggleRow(
+            title: NSLocalizedString("settings.toggle.amount", comment: "SettingsVC.swift: Show Amount"),
+            toggle: amountSwitch
+        ))
+
+        // SECTION: Tools
+        stackView.addArrangedSubview(sectionHeader(
+            NSLocalizedString("settings.section.tools", comment: "SettingsVC.swift: Tools")
+        ))
         stackView.addArrangedSubview(sectionSeparatorView())
-        stackView.addArrangedSubview(actionButtonRow(title: "Export CSV", button: exportButton, systemImage: "square.and.arrow.up"))
-        stackView.addArrangedSubview(actionButtonRow(title: "Send Feedback", button: claimButton, systemImage: "paperplane"))
+        stackView.addArrangedSubview(actionButtonRow(
+            title: NSLocalizedString("settings.tools.exportCSV", comment: "SettingsVC.swift: Export CSV"),
+            button: exportButton,
+            systemImage: "square.and.arrow.up"
+        ))
+        stackView.addArrangedSubview(actionButtonRow(
+            title: NSLocalizedString("settings.tools.sendFeedback", comment: "SettingsVC.swift: Send Feedback"),
+            button: claimButton,
+            systemImage: "paperplane"
+        ))
         
     }
     
@@ -327,7 +361,7 @@ final class SettingsVC: BaseVC {
         containerView?.backgroundColor = .clear
         
         // Title
-        titleLabel.text = "Settings"
+        titleLabel.text = NSLocalizedString("settings.title", comment: "SettingsVC.swift: Settings")
         titleLabel.font = AppTheme.Font.secondaryTitle
         titleLabel.textColor = AppTheme.Color.label
         
@@ -578,13 +612,15 @@ extension SettingsVC {
             }
             present(av, animated: true)
         } catch {
-            presentAlert(title: "Export Failed", message: error.localizedDescription)
-        }
+            presentAlert(title: NSLocalizedString("settings.export.failed.title", comment: "SettingsVC.swift: Export Failed"),message: error.localizedDescription)}
     }
 
     private func presentAlert(title: String, message: String) {
         let a = UIAlertController(title: title, message: message, preferredStyle: .alert)
-        a.addAction(UIAlertAction(title: "OK", style: .default))
+        a.addAction(UIAlertAction(
+            title: NSLocalizedString("button.ok", comment: "SettingsVC.swift: OK"),
+            style: .default
+        ))
         present(a, animated: true)
     }
 }
@@ -708,22 +744,22 @@ extension SettingsVC: MFMailComposeViewControllerDelegate {
                     if !success {
                         // 메일 앱 대체제도 없는 경우 → Alert 표시
                         let alert = UIAlertController(
-                            title: "Mail Not Available",
-                            message: "Please install or configure a mail app to send feedback.",
+                            title: NSLocalizedString("settings.mail.unavailable.title", comment: "SettingsVC.swift: Mail Not Available"),
+                            message: NSLocalizedString("settings.mail.unavailable.message", comment: "SettingsVC.swift: Please install or configure a mail app to send feedback."),
                             preferredStyle: .alert
                         )
-                        alert.addAction(UIAlertAction(title: "OK", style: .default))
+                        alert.addAction(UIAlertAction(title: NSLocalizedString("button.ok", comment: "SettingsVC.swift: OK"), style: .default))
                         self.present(alert, animated: true)
                     }
                 }
             } else {
                 // URL 생성조차 실패한 경우도 대비
                 let alert = UIAlertController(
-                    title: "Mail Not Available",
-                    message: "Please install or configure a mail app to send feedback.",
+                    title: NSLocalizedString("settings.mail.unavailable.title", comment: "SettingsVC.swift: Mail Not Available"),
+                    message: NSLocalizedString("settings.mail.unavailable.message", comment: "SettingsVC.swift: Please install or configure a mail app to send feedback."),
                     preferredStyle: .alert
                 )
-                alert.addAction(UIAlertAction(title: "OK", style: .default))
+                alert.addAction(UIAlertAction(title: NSLocalizedString("button.ok", comment: "SettingsVC.swift: OK"), style: .default))
                 present(alert, animated: true)
             }
             return
@@ -732,23 +768,25 @@ extension SettingsVC: MFMailComposeViewControllerDelegate {
         let composer = MFMailComposeViewController()
         composer.mailComposeDelegate = self
         composer.setToRecipients(["feedback@myapp.com"]) // 앱용 이메일
-        composer.setSubject("[Feedback] Bindo App")
-        
+        composer.setSubject(NSLocalizedString("settings.mail.subject", comment: "SettingsVC.swift: [Feedback] Bindo App"))
+
         // 자동 정보 추가
         let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
         let buildNumber = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?"
         let systemVersion = UIDevice.current.systemVersion
         let deviceModel = UIDevice.current.model
         
+
         let body = """
 
-        Please write your feedback above this line.
+        \(NSLocalizedString("settings.mail.body.tip", comment: "SettingsVC.swift: Please write your feedback above this line."))
 
         -------------------
         App Version: \(appVersion) (\(buildNumber))
         Device: \(deviceModel)
         iOS: \(systemVersion)
         """
+        composer.setMessageBody(body, isHTML: false)
         
         composer.setMessageBody(body, isHTML: false)
         

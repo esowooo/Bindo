@@ -21,26 +21,58 @@ final class IntervalView: UIView {
     private let bottomSeparator = AppSeparator()
     private let bottomStack = UIStackView()
     private let summaryBadge = UIView()
-    private let summaryLabel = AppLabel("Summary", style: .secondaryBody, tone: .main2)
-    private let summaryValue = AppLabel("Next Payday: --", style: .caption, tone: .label)
+    private let summaryLabel = AppLabel(
+        NSLocalizedString("intervalView.summary.title", comment: "IntervalView.swift: Summary"),
+        style: .secondaryBody,
+        tone: .main2
+    )
+    private let summaryValue = AppLabel(
+        NSLocalizedString("intervalView.summary.nextDash", comment: "IntervalView.swift: Next Payday: --"),
+        style: .caption,
+        tone: .label
+    )
     
     
     // MARK: - UI 구성요소
-    private let nameLabel   = AppLabel("Name", style: .secondaryBody, tone: .main2)
+    private let nameLabel   = AppLabel(
+        NSLocalizedString("intervalView.name", comment: "IntervalView.swift: Name"),
+        style: .secondaryBody,
+        tone: .main2
+    )
     private let nameField   = AppTextField(placeholder: "", kind: .standard)
     
-    private let amountLabel = AppLabel("Amount", style: .secondaryBody, tone: .main2)
+    private let amountLabel = AppLabel(
+        NSLocalizedString("intervalView.amount", comment: "IntervalView.swift: Amount"),
+        style: .secondaryBody,
+        tone: .main2
+    )
     private let amountField = AppTextField(placeholder: "", kind: .numeric)
     
-    private let startLabel  = AppLabel("Start Date", style: .secondaryBody, tone: .main2)
+    private let startLabel  = AppLabel(
+        NSLocalizedString("intervalView.startDate", comment: "IntervalView.swift: Start Date"),
+        style: .secondaryBody,
+        tone: .main2
+    )
     private let startPicker = AppDatePicker(initial: Date())
     
-    private let intervalLabel = AppLabel("Interval", style: .secondaryBody, tone: .main2)
-    private let intervalValuePD  = AppPullDownField(placeholder: "Value")
-    private let intervalUnitPD   = AppPullDownField(placeholder: "Unit")
+    private let intervalLabel = AppLabel(
+        NSLocalizedString("intervalView.interval", comment: "IntervalView.swift: Interval"),
+        style: .secondaryBody,
+        tone: .main2
+    )
+    private let intervalValuePD  = AppPullDownField(placeholder:
+        NSLocalizedString("intervalView.value.placeholder", comment: "IntervalView.swift: Value")
+    )
+    private let intervalUnitPD   = AppPullDownField(placeholder:
+        NSLocalizedString("intervalView.unit.placeholder", comment: "IntervalView.swift: Unit")
+    )
     
     private let endSwitchRow = UIStackView()
-    private let endTitle     = AppLabel("End Date (Optional)", style: .secondaryBody, tone: .main2)
+    private let endTitle     = AppLabel(
+        NSLocalizedString("intervalView.endDateOptional", comment: "IntervalView.swift: End Date (Optional)"),
+        style: .secondaryBody,
+        tone: .main2
+    )
     private let endToggleButton    = UIButton(type: .system)
     private let endPicker    = AppDatePicker(initial: Date())
     private lazy var dateFormatter: DateFormatter = {
@@ -53,8 +85,16 @@ final class IntervalView: UIView {
     // Start 섹션 오른쪽 체크박스 + 라벨
     private let includeRow   = UIStackView()
     private let includeBtn   = UIButton(type: .system)
-    private let includeLabel = AppLabel("Include as Payday", style: .secondaryBody, tone: .main2)
-    private let intervalPrefix = AppLabel("Once in", style: .body, tone: .label)
+    private let includeLabel = AppLabel(
+        NSLocalizedString("intervalView.includeToday", comment: "IntervalView.swift: Include as Payday"),
+        style: .secondaryBody,
+        tone: .main2
+    )
+    private let intervalPrefix = AppLabel(
+        NSLocalizedString("intervalView.onceIn", comment: "IntervalView.swift: Once in"),
+        style: .body,
+        tone: .label
+    )
     
     // 구분선
     private let sep1 = AppSeparator()
@@ -75,10 +115,14 @@ final class IntervalView: UIView {
         
         var title: String {
             switch self {
-            case .days:   return "Day(s)"
-            case .weeks:  return "Week(s)"
-            case .months: return "Month(s)"
-            case .years:  return "Year(s)"
+            case .days:
+                return NSLocalizedString("intervalView.unit.days", comment: "IntervalView.swift: Day(s)")
+            case .weeks:
+                return NSLocalizedString("intervalView.unit.weeks", comment: "IntervalView.swift: Week(s)")
+            case .months:
+                return NSLocalizedString("intervalView.unit.months", comment: "IntervalView.swift: Month(s)")
+            case .years:
+                return NSLocalizedString("intervalView.unit.years", comment: "IntervalView.swift: Year(s)")
             }
         }
     }
@@ -494,9 +538,12 @@ final class IntervalView: UIView {
         if includeTodayAsPayday {
             // 체크 시: 첫 급여일은 start 자체
             let nextText = dateFormatter.string(from: start)
-            var parts: [String] = ["Next Payday: \(nextText)"]
+            var parts: [String] = [
+                String(format: NSLocalizedString("intervalView.summary.nextFmt", comment: "IntervalView.swift: Next Payday: %@"), nextText)
+            ]
             if let end = end {
-                parts.append("End: \(dateFormatter.string(from: end))")
+                parts.append(String(format: NSLocalizedString("intervalView.summary.endFmt", comment: "IntervalView.swift: End: %@"),
+                                    dateFormatter.string(from: end)))
             }
             summaryValue.text = parts.joined(separator: "   /   ")
             return
@@ -509,12 +556,14 @@ final class IntervalView: UIView {
                                                  end: end,
                                                  calendar: .current) {
             let nextText = dateFormatter.string(from: next)
-            var parts: [String] = ["Next Payday: \(nextText)"]
+            var parts: [String] = [
+                String(format: NSLocalizedString("intervalView.summary.nextFmt", comment: "IntervalView.swift: Next Payday: %@"), nextText)
+            ]
             
             // 유저가 End Date를 보이도록 설정했으면 요약에 함께 표기
             if let end = end {
                 let endText = dateFormatter.string(from: end)
-                parts.append("End: \(endText)")
+                parts.append(String(format: NSLocalizedString("intervalView.summary.endFmt", comment: "IntervalView.swift: End: %@"), endText))
             }
             
             summaryValue.text = parts.joined(separator: "   /   ")
@@ -522,9 +571,12 @@ final class IntervalView: UIView {
             // 계산 불가 시
             if let end = end {
                 let endText = dateFormatter.string(from: end)
-                summaryValue.text = "Next Payday: --   /   End: \(endText)"
+                summaryValue.text = String(
+                    format: NSLocalizedString("intervalView.summary.nextDashEndFmt", comment: "IntervalView.swift: Next Payday: --   /   End: %@"),
+                    endText
+                )
             } else {
-                summaryValue.text = "Next Payday: --"
+                summaryValue.text = NSLocalizedString("intervalView.summary.nextDash", comment: "IntervalView.swift: Next Payday: --")
             }
         }
     }
@@ -542,7 +594,7 @@ private extension Collection {
 
 // MARK: - BindoForm
 extension IntervalView: BindoForm {
-    // 폼 이름(저장 시 option에 기록)
+    // 폼 이름(저장 시 option에 기록) → 데이터 구분자이므로 현지화하지 않음
     var optionName: String { "Interval" }
     
     private func computeEndDate(start: Date, interval: Interval, calendar cal: Calendar = .current) -> Date {
@@ -559,15 +611,27 @@ extension IntervalView: BindoForm {
         // 검증 1,2: Missing Fields
         let name = (nameField.text ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty else {
-            self.shake(); _ = presentInfo("Required", "Please enter Name.")
-            throw BindoFormError.missingField("Name")
+            self.shake()
+            _ = presentInfo(
+                NSLocalizedString("intervalView.alert.required.title", comment: "IntervalView.swift: Required"),
+                NSLocalizedString("intervalView.alert.required.name", comment: "IntervalView.swift: Please enter Name.")
+            )
+            throw BindoFormError.missingField(
+                NSLocalizedString("intervalView.field.name", comment: "IntervalView.swift: Name")
+            )
         }
         guard
             let amountText = amountField.text?.trimmingCharacters(in: .whitespacesAndNewlines),
             let amount = Decimal(string: amountText), amount > 0
         else {
-            self.shake(); _ = presentInfo("Required", "Please enter Amount.")
-            throw BindoFormError.missingField("Amount")
+            self.shake()
+            _ = presentInfo(
+                NSLocalizedString("intervalView.alert.required.title", comment: "IntervalView.swift: Required"),
+                NSLocalizedString("intervalView.alert.required.amount", comment: "IntervalView.swift: Please enter Amount.")
+            )
+            throw BindoFormError.missingField(
+                NSLocalizedString("intervalView.field.amount", comment: "IntervalView.swift: Amount")
+            )
         }
         
         // ② 폼 → 필드 매핑
@@ -578,7 +642,11 @@ extension IntervalView: BindoForm {
         
         // 검증3: endAt < startDate 차단
         if let endAt, Calendar.current.startOfDay(for: endAt) < Calendar.current.startOfDay(for: start) {
-            self.shake(); _ = presentInfo("Invalid Interval", "End Date cannot be earlier than Start Date.")
+            self.shake()
+            _ = presentInfo(
+                NSLocalizedString("intervalView.alert.invalid.title", comment: "IntervalView.swift: Invalid Interval"),
+                NSLocalizedString("intervalView.alert.invalid.endEarlier", comment: "IntervalView.swift: End Date cannot be earlier than Start Date.")
+            )
             throw BindoFormError.inferredIntervalUnsupported
         }
         
@@ -587,10 +655,15 @@ extension IntervalView: BindoForm {
             ? cal.startOfDay(for: start)
             : computeEndDate(start: start, interval: interval, calendar: cal)
         
-        // 검증 3: 첫 사이클 종료가 endAt을 초과하면 저장 금지 (endAt 포함 규칙)
+        // 검증 4: 첫 사이클 종료가 endAt을 초과하면 저장 금지 (endAt 포함 규칙)
         if let endAt, cal.startOfDay(for: firstEndPreview) > cal.startOfDay(for: endAt) {
-            self.shake(); _ = presentInfo("Invalid Interval",
-                                          "First payday will be \(dateFormatter.string(from: firstEndPreview)) which exceeds End Date.")
+            self.shake()
+            _ = presentInfo(
+                NSLocalizedString("intervalView.alert.invalid.title", comment: "IntervalView.swift: Invalid Interval"),
+                String(format: NSLocalizedString("intervalView.alert.invalid.firstExceeds",
+                                                 comment: "IntervalView.swift: First payday will be %@ which exceeds End Date."),
+                       dateFormatter.string(from: firstEndPreview))
+            )
             throw BindoFormError.incorrectInterval
         }
         

@@ -5,6 +5,14 @@
 
 import UIKit
 
+
+
+// MARK: - Shared number formatting (plain numeric, no locale)
+fileprivate func formatPlainNumber(_ v: Double) -> String {
+    return (v == floor(v)) ? String(format: "%.0f", v)
+                           : String(format: "%.2f", v)
+}
+
 /// 스크롤 없이 현재 선택된 범위를 화면 너비에 맞춰 그리는 막대 차트.
 /// - X 라벨은 막대 아래에 함께 그림
 /// - Y 축/그리드/기준선은 아래 AxisOverlayView 가 담당
@@ -59,12 +67,6 @@ final class BarChartView: UIView {
         self.granularity = granularity
         self.calendar = calendar
         setNeedsDisplay()
-    }
-    private func formatValue(_ v: Double) -> String {
-        if v >= 1_000_000 { return String(format: "%.1fm", v / 1_000_000) }
-        if v >= 1_000     { return String(format: "%.1fk", v / 1_000) }
-        if v == floor(v)  { return String(format: "%.0f", v) }
-        return String(format: "%.2f", v)
     }
 
     /// 특정 막대 인덱스의 X(뷰 좌표, 막대 중앙) — 기준선 위치 계산용
@@ -129,7 +131,7 @@ final class BarChartView: UIView {
             let x = startX + CGFloat(hi) * step
             let r = CGRect(x: x, y: plot.maxY - h, width: barWidth, height: h)
             
-            let text = formatValue(v)
+            let text = formatPlainNumber(v)
             let attrs: [NSAttributedString.Key: Any] = [
                 .font: valueFont,
                 .foregroundColor: valueTextColor
@@ -236,7 +238,7 @@ final class AxisOverlayView: UIView {
         let ticks = niceTicks(min: 0, max: maxY, tickCount: 5)
            for t in ticks {
                let y = plot.maxY - CGFloat(t / maxY) * plot.height
-               let text = yLabel(for: t)
+               let text = formatPlainNumber(t)
                let attrs: [NSAttributedString.Key: Any] = [
                    .font: labelFont,
                    .foregroundColor: labelColor
@@ -260,12 +262,6 @@ final class AxisOverlayView: UIView {
     }
 
     // MARK: - Utils
-    private func yLabel(for v: Double) -> String {
-        if v >= 1_000_000 { return String(format: "%.1fm", v/1_000_000) }
-        if v >= 1_000     { return String(format: "%.1fk", v/1_000) }
-        if v == floor(v)  { return String(format: "%.0f", v) }
-        return String(format: "%.2f", v)
-    }
 
     private func niceTicks(min: Double, max: Double, tickCount: Int) -> [Double] {
         guard max > min, tickCount > 1 else { return [min, max] }

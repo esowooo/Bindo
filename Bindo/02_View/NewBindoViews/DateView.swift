@@ -8,13 +8,17 @@ import UIKit
 // MARK: - 날짜/금액 1행 뷰
 final class OccurrenceRowView: UIView {
     // UI
-    
     private let rowStack = UIStackView()
     
     var index: Int? {
         didSet {
             if let i = index {
-                occLabel.text = "Next Payday \(i)"
+                // "Next Payday %d"
+                occLabel.text = String(
+                    format: NSLocalizedString("dateView.nextPayday.index",
+                                              comment: "DateView.swift: Next Payday %d"),
+                    i
+                )
                 occLabel.isHidden = false
             } else {
                 occLabel.isHidden = true
@@ -22,9 +26,15 @@ final class OccurrenceRowView: UIView {
         }
     }
     
-    private let occLabel = AppLabel("Next Payday ", style: .secondaryBody, tone: .main2)
+    private let occLabel = AppLabel(
+        NSLocalizedString("dateView.nextPayday",
+                          comment: "DateView.swift: Next Payday"),
+        style: .secondaryBody,
+        tone: .main2
+    )
     private let nextPicker = AppDatePicker(initial: Date())
-    //Amount 필드 편집 가능 여부 제어
+    
+    // Amount 필드 편집 가능 여부 제어
     var isAmountEditable: Bool = true {
         didSet {
             amountField.isEnabled = isAmountEditable
@@ -32,7 +42,11 @@ final class OccurrenceRowView: UIView {
             amountField.alpha = isAmountEditable ? 1.0 : 0.55
         }
     }
-    private let amountLabel = AppLabel("Amount", style: .secondaryBody, tone: .main2)
+    private let amountLabel = AppLabel(
+        NSLocalizedString("dateView.amount", comment: "DateView.swift: Amount"),
+        style: .secondaryBody,
+        tone: .main2
+    )
     private let amountField = AppTextField(placeholder: "")
     private let removeButton: UIButton = {
         var cfg = UIButton.Configuration.plain()
@@ -155,8 +169,8 @@ final class OccurrenceRowView: UIView {
         // 금액 변경 시 알림
         amountField.addTarget(self, action: #selector(amountEditingChanged), for: .editingChanged)
     }
-    @objc private func removeTapped() {onRemove?()}
-    @objc private func amountEditingChanged() {onChange?()}
+    @objc private func removeTapped() { onRemove?() }
+    @objc private func amountEditingChanged() { onChange?() }
 
     // 외부 접근자
     var nextDate: Date {
@@ -183,10 +197,9 @@ final class OccurrenceRowView: UIView {
     func focusAmount() -> Bool {
         amountField.becomeFirstResponder()
     }
-    
-    
-    
 }
+
+
 
 // MARK: - DateView
 final class DateView: UIView {
@@ -199,12 +212,20 @@ final class DateView: UIView {
     private let bottomStack = UIStackView()
     
     // 섹션: 이름
-    private let nameLabel = AppLabel("Name", style: .secondaryBody, tone: .main2)
+    private let nameLabel = AppLabel(
+        NSLocalizedString("dateView.name", comment: "DateView.swift: Name"),
+        style: .secondaryBody,
+        tone: .main2
+    )
     private let nameField = AppTextField(placeholder: "")
     private let sep1 = AppSeparator()
 
     // 섹션: Start (단일)
-    private let startLabel = AppLabel("Start Date", style: .secondaryBody, tone: .main2)
+    private let startLabel = AppLabel(
+        NSLocalizedString("dateView.startDate", comment: "DateView.swift: Start Date"),
+        style: .secondaryBody,
+        tone: .main2
+    )
     private let startPicker = AppDatePicker(initial: Date())
     private let sepStart = AppSeparator()
     private static let dateFormatter: DateFormatter = {
@@ -229,7 +250,8 @@ final class DateView: UIView {
         return button
     }()
     private let copyAmountLabel = AppLabel(
-        "Use base amount for additional paydays",
+        NSLocalizedString("dateView.copyAmount",
+                          comment: "DateView.swift: Use base amount for additional paydays"),
         style: .secondaryBody,
         tone: .main2
     )
@@ -247,9 +269,10 @@ final class DateView: UIView {
         cfg.baseForegroundColor = AppTheme.Color.accent
         cfg.cornerStyle = .capsule
 
-        cfg.attributedTitle = AttributedString("Add row", attributes: AttributeContainer([
-            .font: AppTheme.Font.secondaryBody
-        ]))
+        cfg.attributedTitle = AttributedString(
+            NSLocalizedString("dateView.addRow", comment: "DateView.swift: Add row"),
+            attributes: AttributeContainer([ .font: AppTheme.Font.secondaryBody ])
+        )
 
         let plusImage = UIImage(systemName: "plus")
         let resized = plusImage?.withConfiguration(
@@ -265,7 +288,11 @@ final class DateView: UIView {
 
     // 섹션: 요약
     private let summaryBadge = UIView()
-    private let summaryLabel = AppLabel("Summary", style: .secondaryBody, tone: .main2)
+    private let summaryLabel = AppLabel(
+        NSLocalizedString("dateView.summary", comment: "DateView.swift: Summary"),
+        style: .secondaryBody,
+        tone: .main2
+    )
     private let summaryValue = AppLabel("--", style: .caption, tone: .label)
 
     
@@ -304,10 +331,7 @@ final class DateView: UIView {
     private func buildUI() {
         backgroundColor = .clear
 
-        
-        // ─────────────────────────────────────
-        // 1) 뷰 계층 설정
-        // ─────────────────────────────────────
+        // 1) 뷰 계층
         addSubview(scrollView)
         addSubview(bottomBar)
         bottomBar.addSubview(bottomSeparator)
@@ -315,81 +339,56 @@ final class DateView: UIView {
         summaryBadge.addSubview(summaryLabel)
         bottomStack.addArrangedSubview(summaryBadge)
         bottomStack.addArrangedSubview(summaryValue)
-
         scrollView.addSubview(root)
 
-        
-        // ─────────────────────────────────────
-        // 2) 기본 스타일 적용
-        // ─────────────────────────────────────
-
-
-        // Auto Layout Preparation
+        // 2) 기본 스타일
         [scrollView, bottomBar, bottomSeparator, bottomStack, summaryBadge, summaryLabel].forEach {
             $0.translatesAutoresizingMaskIntoConstraints = false
         }
-        // Scroll View
         scrollView.alwaysBounceVertical = true
         scrollView.showsHorizontalScrollIndicator = false
         scrollView.keyboardDismissMode = .interactive
 
-        // Bottom Stack
         bottomStack.axis = .vertical
         bottomStack.alignment = .center
         bottomStack.spacing = 8
 
-        
-        // Summary Badge
         summaryBadge.setContentHuggingPriority(.required, for: .horizontal)
         summaryBadge.setContentCompressionResistancePriority(.required, for: .horizontal)
-        summaryBadge.backgroundColor = AppTheme.Color.main3.withAlphaComponent(0.15) // 배경 색상
+        summaryBadge.backgroundColor = AppTheme.Color.main3.withAlphaComponent(0.15)
         summaryBadge.layer.cornerRadius = AppTheme.Corner.l
         summaryBadge.layer.cornerCurve = .continuous
 
-        // Summary Label
         summaryLabel.setContentHuggingPriority(.required, for: .horizontal)
         summaryLabel.textAlignment = .center
         
-        // Summary Value
         summaryValue.setContentHuggingPriority(.defaultLow, for: .horizontal)
         summaryValue.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         
-        
-        // Root
         root.translatesAutoresizingMaskIntoConstraints = false
         root.axis = .vertical
         root.spacing = 12
         
-        // ─────────────────────────────────────
-        // 3) 제약(오토레이아웃)
-        // ─────────────────────────────────────
-
-        // Scroll View
+        // 3) 제약
         NSLayoutConstraint.activate([
             scrollView.leadingAnchor.constraint(equalTo: leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: trailingAnchor),
             scrollView.topAnchor.constraint(equalTo: topAnchor),
             scrollView.bottomAnchor.constraint(equalTo: bottomBar.topAnchor)
         ])
-
-        // BottomBar
         NSLayoutConstraint.activate([
             bottomBar.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8),
             bottomBar.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8),
             bottomBar.bottomAnchor.constraint(equalTo: safeAreaLayoutGuide.bottomAnchor),
         ])
-
         bottomBar.heightAnchor.constraint(greaterThanOrEqualToConstant: 44).isActive = true
         
-        // Summary Label
         NSLayoutConstraint.activate([
             summaryLabel.leadingAnchor.constraint(equalTo: summaryBadge.leadingAnchor, constant: 8),
             summaryLabel.trailingAnchor.constraint(equalTo: summaryBadge.trailingAnchor, constant: -8),
             summaryLabel.topAnchor.constraint(equalTo: summaryBadge.topAnchor, constant: 2),
             summaryLabel.bottomAnchor.constraint(equalTo: summaryBadge.bottomAnchor, constant: -2)
         ])
-
-        // Bottom Separator, Bottom Stack
         NSLayoutConstraint.activate([
             bottomSeparator.leadingAnchor.constraint(equalTo: bottomBar.leadingAnchor),
             bottomSeparator.trailingAnchor.constraint(equalTo: bottomBar.trailingAnchor),
@@ -400,8 +399,6 @@ final class DateView: UIView {
             bottomStack.topAnchor.constraint(equalTo: bottomBar.topAnchor, constant: 10),
             bottomStack.bottomAnchor.constraint(equalTo: bottomBar.bottomAnchor, constant: -6)
         ])
-        
-        // Root
         NSLayoutConstraint.activate([
             root.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor, constant: 16),
             root.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor, constant: -16),
@@ -410,11 +407,7 @@ final class DateView: UIView {
             root.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor, constant: -32)
         ])
         
-        
-        // ─────────────────────────────────────
-        // 4) 우선순위/배치(스택에 실제 추가)
-        // ─────────────────────────────────────
-        
+        // 4) 배치
         root.addArrangedSubview(nameLabel)
         root.addArrangedSubview(nameField)
         root.addArrangedSubview(sep1)
@@ -440,7 +433,6 @@ final class DateView: UIView {
         root.addArrangedSubview(addRowButton)
         
         nameField.addDoneToolbar()
-        
     }
 
     private func wireEvents() {
@@ -463,9 +455,7 @@ final class DateView: UIView {
         useBaseAmountCheck.addAction(UIAction { [weak self] _ in
             self?.toggleCopyAmount()
         }, for: .touchUpInside)
-
     }
-
 
     @objc private func addRowTapped() {
         // 메시지: 날짜 먼저 입력 요청
@@ -487,7 +477,6 @@ final class DateView: UIView {
         }
         addRow()
     }
-    
     
     private func toggleCopyAmount() {
         let turningOn = !copyAmountEnabled
@@ -610,9 +599,23 @@ final class DateView: UIView {
         let df = DateView.dateFormatter
         
         var parts: [String] = []
-        parts.append("Payday(s): \(count)")
-        parts.append("Start: \(df.string(from: start))")
-        if let e = lastNext { parts.append("End: \(df.string(from: e))") }
+        parts.append(
+            String(format: NSLocalizedString("dateView.summary.paydays",
+                                             comment: "DateView.swift: Payday(s): %d"),
+                   count)
+        )
+        parts.append(
+            String(format: NSLocalizedString("dateView.summary.start",
+                                             comment: "DateView.swift: Start: %@"),
+                   df.string(from: start))
+        )
+        if let e = lastNext {
+            parts.append(
+                String(format: NSLocalizedString("dateView.summary.end",
+                                                 comment: "DateView.swift: End: %@"),
+                       df.string(from: e))
+            )
+        }
 
         summaryValue.text = parts.joined(separator: "  /  ")
     }
@@ -623,15 +626,30 @@ final class DateView: UIView {
     }
 
     private func showBaseAmountMissingAlert() {
-        presentInfo("Required", "Please enter Amount first.")
+        presentInfo(
+            NSLocalizedString("dateView.alert.required.title",
+                              comment: "DateView.swift: Required"),
+            NSLocalizedString("dateView.alert.baseMissing",
+                              comment: "DateView.swift: Please enter Amount first.")
+        )
     }
 
     private func showBaseRowRequiredAlert() {
-        presentInfo("Required", "Please enter the Amount.")
+        presentInfo(
+            NSLocalizedString("dateView.alert.required.title",
+                              comment: "DateView.swift: Required"),
+            NSLocalizedString("dateView.alert.amountRequired",
+                              comment: "DateView.swift: Please enter the Amount.")
+        )
     }
 
     private func endAfterStartAlert() {
-        presentInfo("Confirm", "End Date must be after the start date.")
+        presentInfo(
+            NSLocalizedString("dateView.alert.confirm.title",
+                              comment: "DateView.swift: Confirm"),
+            NSLocalizedString("dateView.alert.endAfterStart",
+                              comment: "DateView.swift: End Date must be after the start date.")
+        )
     }
 
     private func showOverwriteAmountsAlert(_ completion: @escaping (Bool) -> Void) {
@@ -640,11 +658,17 @@ final class DateView: UIView {
         cfg.icon = UIImage(systemName: "exclamationmark.triangle.fill")
 
         AppAlert.present(from: self,
-                         title: "Confirm",
-                         message: "Do you want to overwrite all paydays amount with base amount?",
+                         title: NSLocalizedString("dateView.alert.overwrite.title",
+                                                  comment: "DateView.swift: Confirm"),
+                         message: NSLocalizedString("dateView.alert.overwrite.message",
+                                                    comment: "DateView.swift: Do you want to overwrite all paydays amount with base amount?"),
                          actions: [
-                            .init(title: "Cancel", style: .cancel) { completion(false) },
-                            .init(title: "OK", style: .primary) { completion(true) }
+                            .init(title: NSLocalizedString("button.cancel",
+                                                           comment: "DateView.swift: Cancel"),
+                                  style: .cancel) { completion(false) },
+                            .init(title: NSLocalizedString("button.ok",
+                                                           comment: "DateView.swift: OK"),
+                                  style: .primary) { completion(true) }
                          ],
                          configuration: cfg)
     }
@@ -655,19 +679,22 @@ final class DateView: UIView {
         sequence(first: self.next as UIResponder?, next: { $0?.next })
             .first { $0 is UIViewController } as? UIViewController
     }
-    
-    
 }
 
 
 // MARK: - BindoForm
 extension DateView: BindoForm {
-    var optionName: String { "date" }
+    var optionName: String { "date" } // 데이터 구분자(현지화 X)
 
     func buildModel() throws -> BindoList {
         // 1) 공통 입력
         let name = nameField.text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        guard !name.isEmpty else { throw BindoFormError.missingField("Name") }
+        guard !name.isEmpty else {
+            throw BindoFormError.missingField(
+                NSLocalizedString("dateView.field.name",
+                                  comment: "DateView.swift: Name")
+            )
+        }
 
         let start = startPicker.date
 
@@ -677,9 +704,7 @@ extension DateView: BindoForm {
 
         // 3) 추가 행 수집 (원본 순서로: 날짜/금액 쌍)
         var pairs: [(date: Date, amount: Decimal?)] = []
-        // baseRow 먼저
-        pairs.append((date: baseNext, amount: baseRow.amount))
-        // 추가 rows
+        pairs.append((date: baseNext, amount: baseRow.amount)) // baseRow 먼저
         for row in rows {
             let next = row.nextDate
             try validateStart(start, before: next)
@@ -692,7 +717,6 @@ extension DateView: BindoForm {
         var seen = Set<Date>()
         for p in pairs {
             let day = Calendar.current.startOfDay(for: p.date)
-            // 같은 날 중복이 있으면 '가장 먼저 등장한 것'만 사용
             if seen.insert(day).inserted {
                 dedup.append((date: day, amount: p.amount))
             }
@@ -703,7 +727,11 @@ extension DateView: BindoForm {
         var baseAmount: Decimal? = nil
         if useBase {
             // 켜려면 baseRow.amount가 필수
-            baseAmount = try requireAmount(baseRow.amount, fieldName: "Amount")
+            baseAmount = try requireAmount(
+                baseRow.amount,
+                fieldName: NSLocalizedString("dateView.field.amount",
+                                             comment: "DateView.swift: Amount")
+            )
         }
 
         // 6) Occurrence 체인 생성
@@ -716,7 +744,11 @@ extension DateView: BindoForm {
             if useBase {
                 pay = baseAmount! // 위에서 검증 완료
             } else {
-                pay = try requireAmount(amtOpt, fieldName: "Amount in rows")
+                pay = try requireAmount(
+                    amtOpt,
+                    fieldName: NSLocalizedString("dateView.field.amountInRows",
+                                                 comment: "DateView.swift: Amount in rows")
+                )
             }
             // start < end 재검증(보수)
             try validateStart(curStart, before: date)
@@ -744,8 +776,8 @@ extension DateView: BindoForm {
             updatedAt: Date(),
             endAt: endAt,
             option: optionName,        // "date"
-            interval: nil,             // ← DateView는 규칙 없이 개별 발생
-            occurrences: occurrences   // ← 반드시 채워짐(최소 1개)
+            interval: nil,             // 규칙 없음 (개별 발생)
+            occurrences: occurrences   // 최소 1개
         )
     }
 
@@ -809,9 +841,8 @@ extension DateView: BindoForm {
         layoutIfNeeded()
     }
 }
-//MARK: - Update Bindo
 
-// DateView.swift
+//MARK: - Update Bindo
 extension DateView {
     func apply(_ m: BindoList) {
         nameField.text = m.name

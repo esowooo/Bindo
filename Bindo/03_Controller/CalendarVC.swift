@@ -347,7 +347,7 @@ extension CalendarVC: UICollectionViewDataSource, UICollectionViewDelegateFlowLa
             AppAlert.present(on: self,
                              title: title,
                              message: message,
-                             actions: [.init(title: "OK", style: .cancel) ],
+                             actions: [.init(title: NSLocalizedString("calendar.ok", comment: "CalendarVC.swift: OK button"),style: .cancel)],
                              configuration: cfg)
             
 //            self.present(alert, animated: true)

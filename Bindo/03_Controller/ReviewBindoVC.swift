@@ -1,5 +1,5 @@
 //
-//  UpdateBindoVC.swift
+//  ReviewBindoVC.swift
 //  Bindo
 //
 //  Created by Sean Choi on 2025/09/17.
@@ -26,19 +26,19 @@ final class ReviewBindoVC: BaseVC {
     private let content = UIStackView()
 
     // 공통 섹션
-    private let nameLabel = AppLabel("Name", style: .secondaryBody, tone: .main2)
-    private let nameValue = AppLabel("--", style: .body, tone: .label)
+    private let nameLabel   = AppLabel(NSLocalizedString("review.name",         comment: "ReviewBindoVC.swift: Name"),         style: .secondaryBody, tone: .main2)
+    private let nameValue   = AppLabel("--", style: .body, tone: .label)
 
-    private let createdLabel = AppLabel("Created Date", style: .secondaryBody, tone: .main2)
+    private let createdLabel = AppLabel(NSLocalizedString("review.createdDate", comment: "ReviewBindoVC.swift: Created Date"), style: .secondaryBody, tone: .main2)
     private let createdValue = AppLabel("--", style: .body, tone: .label)
     
-    private let startLabel = AppLabel("Start Date", style: .secondaryBody, tone: .main2)
-    private let startValue = AppLabel("--", style: .body, tone: .label)
+    private let startLabel  = AppLabel(NSLocalizedString("review.startDate",    comment: "ReviewBindoVC.swift: Start Date"),   style: .secondaryBody, tone: .main2)
+    private let startValue  = AppLabel("--", style: .body, tone: .label)
 
-    private let endLabel = AppLabel("End Date", style: .secondaryBody, tone: .main2)
-    private let endValue = AppLabel("--", style: .body, tone: .label)
+    private let endLabel    = AppLabel(NSLocalizedString("review.endDate",      comment: "ReviewBindoVC.swift: End Date"),     style: .secondaryBody, tone: .main2)
+    private let endValue    = AppLabel("--", style: .body, tone: .label)
 
-    private let optionLabel = AppLabel("Option", style: .secondaryBody, tone: .main2)
+    private let optionLabel = AppLabel(NSLocalizedString("review.option",       comment: "ReviewBindoVC.swift: Option"),       style: .secondaryBody, tone: .main2)
     private let optionValue = AppLabel("--", style: .body, tone: .label)
 
     private let sep1 = AppSeparator()
@@ -49,26 +49,27 @@ final class ReviewBindoVC: BaseVC {
 
     // Occurrence 리스트
     private let occBadge = UIView()
-    private let occTitle = AppLabel("Payment History", style: .secondaryBody, tone: .main1)
+    private let occTitle = AppLabel(NSLocalizedString("review.paymentHistory", comment: "ReviewBindoVC.swift: Payment History"), style: .secondaryBody, tone: .main1)
     private let occStack = UIStackView()
 
     // 컬럼 레이아웃 상수 (필요시 조절)
     private let indexColWidth: CGFloat = 30
     private let columnGap: CGFloat = 30
     private lazy var dateColWidth: CGFloat = {
-        measureText("Payment Date", font: AppTheme.Font.body) // 고정 포맷 기준 측정
+        measureText(NSLocalizedString("review.col.paymentDate", comment: "ReviewBindoVC.swift: Payment Date column header"),
+                    font: AppTheme.Font.body)
     }()
 
     private func measureText(_ text: String, font: UIFont) -> CGFloat {
         let size = (text as NSString).size(withAttributes: [.font: font])
-        // 여유 패딩 약간 포함
         return ceil(size.width) + 4
     }
     
     // 빈 상태
-    private let emptyOccLabel = AppLabel("No saved payments.", style: .caption, tone: .main3)
+    private let emptyOccLabel = AppLabel(NSLocalizedString("review.noPayments", comment: "ReviewBindoVC.swift: No saved payments."),
+                                         style: .caption, tone: .main3)
 
-    // 포맷터
+    // 포맷터 (숫자 고정 포맷 유지)
     private lazy var df: DateFormatter = {
         let f = DateFormatter()
         f.calendar = .current
@@ -107,7 +108,7 @@ final class ReviewBindoVC: BaseVC {
 
         let backItem = AppNavigation.BarItem(
             systemImage: "chevron.backward",
-            accessibilityLabel: "Back",
+            accessibilityLabel: NSLocalizedString("button.back", comment: "ReviewBindoVC.swift: Back"),
             action: UIAction { [weak self] _ in self?.cancelTapped() }
         )
         let left = AppNavigation.makeButton(backItem, style: .plainAccent)
@@ -115,17 +116,17 @@ final class ReviewBindoVC: BaseVC {
         // Edit버튼
         let editItem = AppNavigation.BarItem(
             systemImage: "square.and.pencil",
-            accessibilityLabel: "Edit",
+            accessibilityLabel: NSLocalizedString("button.edit", comment: "ReviewBindoVC.swift: Edit"),
             action: UIAction { [weak self] _ in self?.editTapped() }
         )
         let editBtn = AppNavigation.makeButton(editItem, style: .plainAccent)
 
         AppNavigation.setItems(left: [left], right: [editBtn], for: self)
 
-        // 타이틀 (단일 Review)
+        // 타이틀
         let titleLabel = UILabel()
-        titleLabel.text = "Review"
-        titleLabel.font = AppTheme.Font.body   // 필요하면 .title 등으로 조정
+        titleLabel.text = NSLocalizedString("review.title", comment: "ReviewBindoVC.swift: Review title")
+        titleLabel.font = AppTheme.Font.body
         titleLabel.textColor = AppTheme.Color.label
         titleLabel.textAlignment = .center
         titleLabel.backgroundColor = .clear
@@ -154,12 +155,7 @@ final class ReviewBindoVC: BaseVC {
             content.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor, constant: -32)
         ])
 
-
-        // Occurrence 섹션
-        occStack.axis = .vertical
-        occStack.spacing = 8
-
-        // 컴포지션
+        // 공통 필드 + 구분선
         content.addArrangedSubview(nameLabel)
         content.addArrangedSubview(nameValue)
         content.addArrangedSubview(sep1)
@@ -179,14 +175,16 @@ final class ReviewBindoVC: BaseVC {
         content.addArrangedSubview(optionLabel)
         content.addArrangedSubview(optionValue)
         content.addArrangedSubview(sep5)
- 
-        
+
+        // ── Payment History 배지
         occBadge.backgroundColor = AppTheme.Color.main3.withAlphaComponent(0.15)
         occBadge.layer.cornerRadius = AppTheme.Corner.l
         occBadge.layer.cornerCurve = .continuous
         occBadge.translatesAutoresizingMaskIntoConstraints = false
+
         occTitle.translatesAutoresizingMaskIntoConstraints = false
         occBadge.addSubview(occTitle)
+
         NSLayoutConstraint.activate([
             occTitle.centerXAnchor.constraint(equalTo: occBadge.centerXAnchor),
             occTitle.topAnchor.constraint(equalTo: occBadge.topAnchor, constant: 6),
@@ -195,6 +193,7 @@ final class ReviewBindoVC: BaseVC {
             occTitle.trailingAnchor.constraint(equalTo: occBadge.trailingAnchor, constant: -20)
         ])
         
+        // 배지 홀더(가운데 정렬용)
         let badgeHolder = UIView()
         badgeHolder.translatesAutoresizingMaskIntoConstraints = false
         badgeHolder.addSubview(occBadge)
@@ -203,33 +202,33 @@ final class ReviewBindoVC: BaseVC {
             occBadge.topAnchor.constraint(equalTo: badgeHolder.topAnchor),
             occBadge.bottomAnchor.constraint(equalTo: badgeHolder.bottomAnchor)
         ])
-
         content.addArrangedSubview(badgeHolder)
-        
         
         // ── Payment History 리스트
         occStack.axis = .vertical
         occStack.spacing = 8
-
         content.addArrangedSubview(occStack)
     }
 
     // MARK: - Data
     private func loadAndRender() {
-        let repo = self.repo ?? CoreDataBindoRepository()   // ← 기본값
+        let repo = self.repo ?? CoreDataBindoRepository()
         do {
             guard let bindo = try repo.fetch(id: bindoID) else {
-                AppAlert.info(on: self, title: "Not Found", message: "The item is missing.")
+                AppAlert.info(on: self,
+                              title: NSLocalizedString("review.notFound", comment: "ReviewBindoVC.swift: Not Found"),
+                              message: NSLocalizedString("review.missing",  comment: "ReviewBindoVC.swift: The item is missing."))
                 return
             }
             render(bindo)
         } catch {
-            AppAlert.info(on: self, title: "Error", message: error.localizedDescription)
+            AppAlert.info(on: self,
+                          title: NSLocalizedString("error.title", comment: "ReviewBindoVC.swift: Error"),
+                          message: error.localizedDescription)
         }
     }
 
     private func render(_ b: BindoList) {
-
         // 공통
         nameValue.text = b.name
         createdValue.text = df.string(from: b.createdAt)
@@ -240,7 +239,6 @@ final class ReviewBindoVC: BaseVC {
         }
         endValue.text = b.endAt.map(df.string(from:)) ?? "—"
         optionValue.text = b.option.capitalized
-
 
         // Occurrence 렌더
         while let v = occStack.arrangedSubviews.first {
@@ -254,7 +252,6 @@ final class ReviewBindoVC: BaseVC {
         } else {
             // 헤더
             occStack.addArrangedSubview(makeOccurrenceHeader())
-
             // 행들
             for (i, occ) in occurrences.enumerated() {
                 occStack.addArrangedSubview(makeOccurrenceRow(occ, index: i + 1))
@@ -267,9 +264,9 @@ final class ReviewBindoVC: BaseVC {
         let container = UIView()
         container.translatesAutoresizingMaskIntoConstraints = false
 
-        let idxH = AppLabel("No.", style: .secondaryBody, tone: .main2)
-        let dateH = AppLabel("Payment Date", style: .secondaryBody, tone: .main2)
-        let amountH = AppLabel("Amount", style: .secondaryBody, tone: .main2)
+        let idxH    = AppLabel(NSLocalizedString("review.col.no",          comment: "ReviewBindoVC.swift: No."),           style: .secondaryBody, tone: .main2)
+        let dateH   = AppLabel(NSLocalizedString("review.col.paymentDate", comment: "ReviewBindoVC.swift: Payment Date"),  style: .secondaryBody, tone: .main2)
+        let amountH = AppLabel(NSLocalizedString("review.col.amount",      comment: "ReviewBindoVC.swift: Amount"),        style: .secondaryBody, tone: .main2)
 
         [idxH, dateH, amountH].forEach {
             $0.numberOfLines = 1
@@ -297,14 +294,12 @@ final class ReviewBindoVC: BaseVC {
             amountH.trailingAnchor.constraint(lessThanOrEqualTo: container.trailingAnchor)
         ])
 
-        // 줄바꿈/늘어남 방지
         [idxH, dateH, amountH].forEach {
             $0.setContentHuggingPriority(.required, for: .horizontal)
             $0.setContentCompressionResistancePriority(.required, for: .horizontal)
         }
         return container
     }
-    
     
     private func makeOccurrenceRow(_ occ: OccurrenceList, index: Int) -> UIView {
         let container = UIView()
@@ -343,7 +338,6 @@ final class ReviewBindoVC: BaseVC {
             amtValue.trailingAnchor.constraint(lessThanOrEqualTo: container.trailingAnchor)
         ])
 
-        // 우선순위 안정화
         [idx, dateValue, amtValue].forEach {
             $0.setContentHuggingPriority(.required, for: .horizontal)
             $0.setContentCompressionResistancePriority(.required, for: .horizontal)
@@ -363,13 +357,13 @@ final class ReviewBindoVC: BaseVC {
 
     /// 편집 진입: NewBindoVC를 편집 모드로 푸시 (editingID 전달)
     @objc private func editTapped() {
-        let sb = UIStoryboard(name: "Main", bundle: nil) // <- 실제 스토리보드 이름
+        let sb = UIStoryboard(name: "Main", bundle: nil) // 스토리보드 사용 중이면 ID 연결 필요
         guard let vc = sb.instantiateViewController(withIdentifier: "NewBindoVC") as? NewBindoVC else {
             assertionFailure("Storyboard doesn't have VC with ID 'NewBindoVC'")
             return
         }
         vc.editingID = bindoID
-        vc.repo = self.repo   // 주입 (NewBindoVC.repo가 외부에서 set 가능해야 함)
+        vc.repo = self.repo   // 주입
         navigationController?.pushViewController(vc, animated: true)
     }
 }

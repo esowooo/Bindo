@@ -17,9 +17,18 @@ final class FloatingActionMenu: UIView {
     // MARK: - UI
     private let mainButton = UIButton(type: .system)
     private let stack = UIStackView()
-    private let calendarButton = FloatingActionMenu.makeActionButton(title: "Calendar", systemImage: "calendar")
-    private let statsButton    = FloatingActionMenu.makeActionButton(title: "Stats",    systemImage: "chart.bar.fill")
-    private let settingsButton = FloatingActionMenu.makeActionButton(title: "Settings", systemImage: "gearshape")
+    private let calendarButton = FloatingActionMenu.makeActionButton(
+        title: NSLocalizedString("floatingActionMenu.calendar", comment: "FloatingActionMenu.swift: Calendar button"),
+        systemImage: "calendar"
+    )
+    private let statsButton = FloatingActionMenu.makeActionButton(
+        title: NSLocalizedString("floatingActionMenu.stats", comment: "FloatingActionMenu.swift: Stats button"),
+        systemImage: "chart.bar.fill"
+    )
+    private let settingsButton = FloatingActionMenu.makeActionButton(
+        title: NSLocalizedString("floatingActionMenu.settings", comment: "FloatingActionMenu.swift: Settings button"),
+        systemImage: "gearshape"
+    )
 
     private lazy var backdrop: UIControl = {
         let control = UIControl()
@@ -28,7 +37,7 @@ final class FloatingActionMenu: UIView {
         control.backgroundColor = .clear
         control.isUserInteractionEnabled = true
         control.addTarget(self, action: #selector(close), for: .touchUpInside)
-        control.accessibilityLabel = "Dismiss Menu"
+        control.accessibilityLabel = NSLocalizedString("floatingActionMenu.dismissMenu", comment: "FloatingActionMenu.swift: Dismiss Menu accessibility label")
         return control
     }()
     
@@ -58,7 +67,7 @@ final class FloatingActionMenu: UIView {
         mainButton.translatesAutoresizingMaskIntoConstraints = false
         configureMainButton()
         mainButton.addTarget(self, action: #selector(toggle), for: .touchUpInside)
-        mainButton.accessibilityLabel = "Open Menu"
+        mainButton.accessibilityLabel = NSLocalizedString("floatingActionMenu.openMenu", comment: "FloatingActionMenu.swift: Open Menu accessibility label")
 
         // 스택(액션 버튼들)
         stack.translatesAutoresizingMaskIntoConstraints = false
@@ -130,23 +139,21 @@ final class FloatingActionMenu: UIView {
         config.imagePadding = 8
         config.imagePlacement = .leading
         config.titleAlignment = .leading
-        config.contentInsets = NSDirectionalEdgeInsets(top: 10, leading: 14, bottom: 10, trailing: 14)
+        config.contentInsets = .init(top: 10, leading: 14, bottom: 10, trailing: 14)
         config.cornerStyle = .fixed
-        config.attributedTitle = AttributedString(title, attributes: .init([
-            .font : AppTheme.Font.body
-        ]))
-
-        let button = UIButton(configuration: config)
-        button.translatesAutoresizingMaskIntoConstraints = false
-        button.contentHorizontalAlignment = .leading
-        button.layer.cornerRadius = 14
-        button.layer.shadowColor = UIColor.black.cgColor
-        button.layer.shadowOpacity = 0.12
-        button.layer.shadowRadius = 6
-        button.layer.shadowOffset = CGSize(width: 0, height: 2)
-        button.widthAnchor.constraint(equalToConstant: 180).isActive = true
-        button.heightAnchor.constraint(equalToConstant: 44).isActive = true
-        return button
+        config.attributedTitle = AttributedString(title, attributes: .init([ .font: AppTheme.Font.body ]))
+        let b = UIButton(configuration: config)
+        b.translatesAutoresizingMaskIntoConstraints = false
+        b.contentHorizontalAlignment = .leading
+        b.layer.cornerRadius = 14
+        b.layer.cornerCurve = .continuous
+        b.layer.shadowColor = UIColor.black.cgColor
+        b.layer.shadowOpacity = 0.12
+        b.layer.shadowRadius = 6
+        b.layer.shadowOffset = CGSize(width: 0, height: 2)
+        b.widthAnchor.constraint(equalToConstant: 180).isActive = true
+        b.heightAnchor.constraint(equalToConstant: 44).isActive = true
+        return b
     }
 
     // MARK: - 히트 테스트 (열림/닫힘에 따라 터치 영역 제한)

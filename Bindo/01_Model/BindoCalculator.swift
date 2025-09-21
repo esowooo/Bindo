@@ -20,13 +20,35 @@ enum BindoFormError: Error, LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .missingField(let f):              return "Please input \(f)"
-        case .notEnoughPointsForInference:      return "Need two dates minimum in order to calculate interval."
-        case .inferredIntervalUnsupported:      return "Couldn't identify either day or month interval."
-        case .invalidInterval:                  return "Please enter a valid interval"
-        case .invalidIntervalEqual:             return "Start date and end/next date cannot be the same."
-        case .invalidIntervalReversed:          return "Start date must be before the end/next date."
-        case .incorrectInterval:                return "End Date/Interval setup is incorrect."
+        case .missingField(let f):
+            // "Please input %@"
+            let fmt = NSLocalizedString("bindoFormError.missingField",
+                                        comment: "BindoCalculator.swift: Please input %@")
+            return String(format: fmt, f)
+
+        case .notEnoughPointsForInference:
+            return NSLocalizedString("bindoFormError.notEnoughPointsForInference",
+                                     comment: "BindoCalculator.swift: Need two dates minimum in order to calculate interval.")
+
+        case .inferredIntervalUnsupported:
+            return NSLocalizedString("bindoFormError.inferredIntervalUnsupported",
+                                     comment: "BindoCalculator.swift: Couldn't identify either day or month interval.")
+
+        case .invalidInterval:
+            return NSLocalizedString("bindoFormError.invalidInterval",
+                                     comment: "BindoCalculator.swift: Please enter a valid interval")
+
+        case .invalidIntervalEqual:
+            return NSLocalizedString("bindoFormError.invalidIntervalEqual",
+                                     comment: "BindoCalculator.swift: Start date and end/next date cannot be the same.")
+
+        case .invalidIntervalReversed:
+            return NSLocalizedString("bindoFormError.invalidIntervalReversed",
+                                     comment: "BindoCalculator.swift: Start date must be before the end/next date.")
+
+        case .incorrectInterval:
+            return NSLocalizedString("bindoFormError.incorrectInterval",
+                                     comment: "BindoCalculator.swift: End Date/Interval setup is incorrect.")
         }
     }
 }
@@ -244,7 +266,7 @@ enum BindoCalculator {
                            end: Date?,
                            calendar: Calendar = .current) -> Date? {
         guard let step = makeStep(interval, calendar: calendar) else { return nil }
-        let cal = calendar
+        let cal = calendar   // 🔧 오타 수정
         let refDay = cal.startOfDay(for: ref)
         let endDay = end.map { cal.startOfDay(for: $0) }
         var cur = cal.startOfDay(for: start)
@@ -252,7 +274,7 @@ enum BindoCalculator {
         var hops = 0
         while true {
             let next = step(cur)
-            if next == cur { return nil }             // 안전장치
+            if next == cur { return nil }              // 안전장치
             if let e = endDay, next > e { return nil } // endAt 포함: next == e 허용
             if next >= refDay { return next }          // ref 이상 첫 결제일
             cur = next

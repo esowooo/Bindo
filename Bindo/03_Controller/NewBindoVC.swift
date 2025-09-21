@@ -1,13 +1,11 @@
 //
-//  ReviewBindoVC.swift
+//  NewBindoVC.swift
 //  Bindo
 //
 //  Created by Sean Choi on 9/9/25.
 //
 
 import UIKit
-
-
 
 // MARK: - 폼 프로토콜 (각 Child VC가 채택)
 protocol BindoForm where Self: UIView {
@@ -17,20 +15,19 @@ protocol BindoForm where Self: UIView {
     func reset()
 }
 
-
 // MARK: - Child 종류
 enum BindoChildView: Int, CaseIterable {
     case interval, date
     
     var title: String {
         switch self {
-        case .interval: return "Interval"
-        case .date:   return "Date"
+        case .interval:
+            return NSLocalizedString("newBindo.child.interval", comment: "NewBindoVC.swift: Interval")
+        case .date:
+            return NSLocalizedString("newBindo.child.date", comment: "NewBindoVC.swift: Date")
         }
     }
 }
-
-
 
 // MARK: - 컨테이너 VC
 final class NewBindoVC: BaseVC {
@@ -38,9 +35,10 @@ final class NewBindoVC: BaseVC {
     // MARK: - UI
     @IBOutlet private weak var headView: UIView!
     @IBOutlet private weak var containerView: UIView!
-    private let titleField = AppPullDownField(placeholder: "Interval")
+    private let titleField = AppPullDownField(
+        placeholder: NSLocalizedString("newBindo.placeholder", comment: "NewBindoVC.swift: Placeholder for type selector (Interval)")
+    )
     private var currentConstraints: [NSLayoutConstraint] = []
-    
     
     // MARK: - 데이터/의존성
     var editingID: UUID?
@@ -100,7 +98,7 @@ final class NewBindoVC: BaseVC {
         // 좌/우 버튼은 유지
         let backItem = AppNavigation.BarItem(
             systemImage: "chevron.backward",
-            accessibilityLabel: "Back",
+            accessibilityLabel: NSLocalizedString("button.back", comment: "NewBindoVC.swift: Back"),
             action: UIAction { [weak self] _ in self?.cancelTapped() }
         )
         let left = AppNavigation.makeButton(backItem, style: .plainAccent)
@@ -108,7 +106,7 @@ final class NewBindoVC: BaseVC {
         var cfg = UIButton.Configuration.plain()
         cfg.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 15)
         cfg.attributedTitle = AttributedString(
-            "Save",
+            NSLocalizedString("button.save", comment: "NewBindoVC.swift: Save"),
             attributes: AttributeContainer([
                 .font: AppTheme.Font.body,
                 .foregroundColor: AppTheme.Color.accent
@@ -127,7 +125,7 @@ final class NewBindoVC: BaseVC {
         titleField.translatesAutoresizingMaskIntoConstraints = false
         titleField.displayMode = .customPopup         // 커스텀 팝업 사용
         titleField.titleFont = AppTheme.Font.body
-        titleField.titleColor = AppTheme.Color.label // 버튼 표시 색
+        titleField.titleColor = AppTheme.Color.label  // 버튼 표시 색
         titleField.backgroundFill = .clear            // 네비바 배경에 녹이기
         titleField.contentInsets = AppTheme.PullDown.contentInsets
         titleField.titleAlignment = .center
@@ -147,8 +145,8 @@ final class NewBindoVC: BaseVC {
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 AppAlert.info(
                     on: self,
-                    title: "Not Allowed",
-                    message: "Can't change type for existing bindo."
+                    title: NSLocalizedString("newBindo.alert.notAllowed.title", comment: "NewBindoVC.swift: Not Allowed"),
+                    message: NSLocalizedString("newBindo.alert.notAllowed.message", comment: "NewBindoVC.swift: Can't change type for existing bindo.")
                 )
                 return
             }
@@ -159,9 +157,7 @@ final class NewBindoVC: BaseVC {
 
         // 네비 타이틀에 장착 + 최소 사이즈
         navigationItem.titleView = titleField
-
     }
-    
     
     // MARK: - 화면 전환
     // 사용자가 탭했을 때 호출: 더티면 경고 → OK 시 전환
@@ -182,15 +178,17 @@ final class NewBindoVC: BaseVC {
                 
                 AppAlert.present(
                     on: self,
-                    title: "Discard changes?",
-                    message: "You have unsaved inputs. Switching will delete current inputs.",
+                    title: NSLocalizedString("newBindo.alert.discard.title", comment: "NewBindoVC.swift: Discard changes?"),
+                    message: NSLocalizedString("newBindo.alert.discard.message", comment: "NewBindoVC.swift: You have unsaved inputs. Switching will delete current inputs."),
                     actions: [
-                        .init(title: "Cancel", style: .cancel) { [weak self] in
+                        .init(title: NSLocalizedString("button.cancel", comment: "NewBindoVC.swift: Cancel"),
+                              style: .cancel) { [weak self] in
                             // 타이틀 되돌리기
                             guard let self else { return }
                             self.titleField.select(index: self.currentView.rawValue, emit: false)
                         },
-                        .init(title: "OK", style: .destructive) { [weak self] in
+                        .init(title: NSLocalizedString("button.ok", comment: "NewBindoVC.swift: OK"),
+                              style: .destructive) { [weak self] in
                             guard let self else { return }
                             form.reset()
                             self.snapshots[self.currentView] = form.dirtySignature()
@@ -213,7 +211,6 @@ final class NewBindoVC: BaseVC {
             titleField.select(index: currentView.rawValue, emit: false)
             return
         }
-
 
         currentView = newKind
         let next = childViews[newKind.rawValue]
@@ -268,13 +265,15 @@ final class NewBindoVC: BaseVC {
             }
         }
     }
-
-    
     
     // MARK: - 액션 (Cancel/Save)
     @objc private func saveTapped() {
         guard let form = current as? BindoForm else {
-            AppAlert.info(on: self, title: "Invalid", message: "Form not found")
+            AppAlert.info(
+                on: self,
+                title: NSLocalizedString("newBindo.alert.invalid.title", comment: "NewBindoVC.swift: Invalid"),
+                message: NSLocalizedString("newBindo.alert.invalid.formNotFound", comment: "NewBindoVC.swift: Form not found")
+            )
             return
         }
         do {
@@ -285,9 +284,14 @@ final class NewBindoVC: BaseVC {
                 let oldOpt = existing.option.lowercased()
                 let newOpt = model.option.lowercased()
                 if oldOpt != newOpt {
-                    AppAlert.info(on: self,
-                                  title: "Not allowed",
-                                  message: "This item was created in \(oldOpt.capitalized) view. Changing to \(newOpt.capitalized) is restricted.")
+                    AppAlert.info(
+                        on: self,
+                        title: NSLocalizedString("newBindo.alert.notAllowed.title", comment: "NewBindoVC.swift: Not allowed"),
+                        message: String(
+                            format: NSLocalizedString("newBindo.alert.notAllowed.changeType", comment: "NewBindoVC.swift: Can't change type message"),
+                            oldOpt.capitalized, newOpt.capitalized
+                        )
+                    )
                     return
                 }
 
@@ -311,7 +315,11 @@ final class NewBindoVC: BaseVC {
             popToMain()
 
         } catch {
-            AppAlert.info(on: self, title: "Invalid", message: error.localizedDescription)
+            AppAlert.info(
+                on: self,
+                title: NSLocalizedString("newBindo.alert.invalid.title", comment: "NewBindoVC.swift: Invalid"),
+                message: error.localizedDescription
+            )
         }
     }
     private func popToMain() {
@@ -333,7 +341,4 @@ final class NewBindoVC: BaseVC {
             dismiss(animated: true)
         }
     }
-    
 }
-
-
