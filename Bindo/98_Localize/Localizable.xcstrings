@@ -312,7 +312,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ok"
+            "value" : "確認"
           }
         },
         "ko" : {
@@ -358,7 +358,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ok"
+            "value" : "確認"
           }
         },
         "ko" : {

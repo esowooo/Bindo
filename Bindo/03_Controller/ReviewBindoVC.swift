@@ -305,7 +305,7 @@ final class ReviewBindoVC: BaseVC {
         let container = UIView()
         container.translatesAutoresizingMaskIntoConstraints = false
 
-        let idx = AppLabel("\(index)", style: .caption, tone: .label)
+        let idx = AppLabel("\(index)", style: .body, tone: .label)
         let dateValue = AppLabel(df.string(from: occ.endDate), style: .body, tone: .label)
 
         let amtCore = nf.string(from: occ.payAmount as NSDecimalNumber) ?? "\(occ.payAmount)"
